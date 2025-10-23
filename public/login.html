@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login - CMS Pandda</title>
+  <link rel="stylesheet" href="/src/entities/login/login.css" />
+</head>
+<body>
+  <main class="login-page">
+    <section class="login-card">
+      <h1>CMS Pandda</h1>
+      <form id="loginForm">
+        <label for="email">E-mail</label>
+        <input id="email" type="email" required />
+        <label for="password">Senha</label>
+        <input id="password" type="password" required />
+        <div class="actions">
+          <button type="submit">Entrar</button>
+          <button id="themeToggle" type="button">Alternar tema</button>
+        </div>
+      </form>
+      <p class="hint">Use credenciais de admin ou superadmin</p>
+    </section>
+  </main>
+
+  <script src="/_env.js"></script>
+  <script type="module" src="/src/core/supabase.js"></script>
+  <script type="module" src="/src/core/theme.js"></script>
+  <script type="module" src="/src/entities/login/login.js"></script>
+</body>
+</html>

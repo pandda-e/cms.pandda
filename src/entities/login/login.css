@@ -1,0 +1,24 @@
+/* src/entities/login/login.css */
+:root {
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --text: #0f1724;
+  --accent: #2563eb;
+}
+[data-theme="dark"] {
+  --bg: #0b1220;
+  --card: #071029;
+  --text: #e6eef8;
+  --accent: #60a5fa;
+}
+* { box-sizing: border-box; }
+body { margin:0; font-family: Inter, system-ui, sans-serif; background:var(--bg); color:var(--text); }
+.login-page { display:flex; min-height:100vh; align-items:center; justify-content:center; padding:2rem; }
+.login-card { background:var(--card); width:360px; padding:2rem; border-radius:12px; box-shadow:0 8px 30px rgba(2,6,23,0.12); }
+.login-card h1 { margin:0 0 1rem 0; font-size:1.25rem; }
+.login-card label { display:block; font-size:0.85rem; margin-top:0.75rem; }
+.login-card input { width:100%; padding:0.6rem; margin-top:0.25rem; border-radius:8px; border:1px solid rgba(15,23,36,0.08); }
+.actions { display:flex; gap:0.5rem; margin-top:1rem; }
+.actions button { flex:1; padding:0.6rem; border-radius:8px; border:none; background:var(--accent); color:white; cursor:pointer; }
+.actions #themeToggle { background:transparent; color:var(--accent); border:1px solid rgba(37,99,235,0.15); }
+.hint { font-size:0.8rem; margin-top:1rem; color:rgba(15,23,36,0.6); }
