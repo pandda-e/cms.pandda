@@ -55,3 +55,4 @@ export function onAuthStateChange(cb) {
     try { sub?.data?.subscription?.unsubscribe?.(); } catch (_) {}
   };
 }
+
