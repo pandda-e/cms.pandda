@@ -18,18 +18,22 @@ function initTheme(){
   if(saved) return applyTheme(saved);
   applyTheme('dark');
 }
-themeToggle.addEventListener('click', () => {
-  const newTheme = body.classList.contains('theme-dark') ? 'light' : 'dark';
-  applyTheme(newTheme);
-});
+if (themeToggle) {
+  themeToggle.addEventListener('click', () => {
+    const newTheme = body.classList.contains('theme-dark') ? 'light' : 'dark';
+    applyTheme(newTheme);
+  });
+}
 initTheme();
 
 function setLoading(on){
-  submitBtn.disabled = on;
-  submitBtn.textContent = on ? 'Entrando...' : 'Entrar';
+  if (submitBtn) {
+    submitBtn.disabled = on;
+    submitBtn.textContent = on ? 'Entrando...' : 'Entrar';
+  }
 }
 function showError(message){
-  errEl.textContent = message || '';
+  if (errEl) errEl.textContent = message || '';
 }
 
 async function handlePostLogin(user){
@@ -39,32 +43,34 @@ async function handlePostLogin(user){
     await supabase.auth.signOut();
     return;
   }
-  if(profile.role === 'superadmin') window.location.href = '/public/admin.html';
-  else window.location.href = '/public/user.html';
+  if(profile.role === 'superadmin') window.location.href = '/admin.html';
+  else window.location.href = '/user.html';
 }
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  showError('');
-  setLoading(true);
-  const email = form.email.value.trim();
-  const password = form.password.value;
-  if(!email || !password){
-    showError('Preencha email e senha.');
-    setLoading(false);
-    return;
-  }
-  try{
-    const res = await signIn(email, password);
-    const user = res?.user ?? null;
-    if(!user) throw new Error('Resposta de autenticação inválida');
-    await handlePostLogin(user);
-  }catch(err){
-    showError(err?.message || 'Falha no login');
-  }finally{
-    setLoading(false);
-  }
-});
+if (form) {
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    showError('');
+    setLoading(true);
+    const email = form.email.value.trim();
+    const password = form.password.value;
+    if(!email || !password){
+      showError('Preencha email e senha.');
+      setLoading(false);
+      return;
+    }
+    try{
+      const res = await signIn(email, password);
+      const user = res?.user ?? null;
+      if(!user) throw new Error('Resposta de autenticação inválida');
+      await handlePostLogin(user);
+    }catch(err){
+      showError(err?.message || 'Falha no login');
+    }finally{
+      setLoading(false);
+    }
+  });
+}
 
 (async function checkSession(){
   try{

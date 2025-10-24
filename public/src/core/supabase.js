@@ -19,8 +19,9 @@ export async function getCurrentUser() {
   return res?.data?.user ?? null;
 }
 
+// Padronizado para usar a tabela 'profiles' para buscar dados do perfil
 export async function getProfile(id) {
-  const { data, error } = await supabase.from('users').select('*').eq('id', id).single();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single();
   if (error) throw error;
   return data ?? null;
 }
@@ -55,4 +56,3 @@ export function onAuthStateChange(cb) {
     try { sub?.data?.subscription?.unsubscribe?.(); } catch (_) {}
   };
 }
-
