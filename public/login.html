@@ -1,44 +1,56 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Login — CMS.PANDDA</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login</title>
   <link rel="stylesheet" href="/src/entities/login/login.css" />
 </head>
-<body class="theme-dark">
-  <main class="login-root">
-    <section class="login-card" role="main" aria-labelledby="login-title">
-      <header class="login-header">
-        <div class="brand">
-          <img src="/assets/logo.png" alt="logo" class="brand-logo" />
-          <h1 id="login-title">CMS.PANDDA</h1>
-        </div>
-        <button id="theme-toggle" class="theme-toggle" aria-label="Alternar tema">
-          <span class="icon">🌙</span>
-        </button>
-      </header>
-
-      <form id="login-form" class="login-form" autocomplete="off" novalidate>
-        <label for="email" class="label">Email</label>
-        <input id="email" name="email" type="email" inputmode="email" autocomplete="username" required />
-
-        <label for="password" class="label">Senha</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required />
-
-        <button id="submit-btn" class="btn primary" type="submit">Entrar</button>
-
-        <div id="login-error" class="error" role="alert" aria-live="polite"></div>
-      </form>
-
-      <footer class="login-footer">
-        <small>Somente usuários autorizados</small>
-      </footer>
-    </section>
+<body>
+  <main>
+    <img src="/assets/logo.png" alt="Logo" />
+    <form id="login-form">
+      <input type="email" id="email" placeholder="Email" required />
+      <input type="password" id="password" placeholder="Senha" required />
+      <button type="submit">Entrar</button>
+    </form>
   </main>
 
   <script src="/_env.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.min.js"></script>
-  <script type="module" src="/src/entities/login/login.js"></script>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    const supabase = createClient(
+      window.__ENV.SUPABASE_URL,
+      window.__ENV.SUPABASE_ANON_KEY
+    )
+
+    const form = document.getElementById('login-form')
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const email = document.getElementById('email').value
+      const password = document.getElementById('password').value
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+      if (error) {
+        alert('Erro ao entrar: ' + error.message)
+      } else {
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+
+        if (profile?.role === 'admin') {
+          window.location.replace('/admin.html')
+        } else {
+          window.location.replace('/user.html')
+        }
+      }
+    })
+  </script>
 </body>
 </html>
