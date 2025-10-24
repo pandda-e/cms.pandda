@@ -39,8 +39,8 @@ async function handlePostLogin(user){
     await supabase.auth.signOut();
     return;
   }
-  if(profile.role === 'superadmin') window.location.href = '/admin.html';
-  else window.location.href = '/user.html';
+  if(profile.role === 'superadmin') window.location.href = '/public/admin.html';
+  else window.location.href = '/public/user.html';
 }
 
 form.addEventListener('submit', async (e) => {
