@@ -17,25 +17,27 @@
   </main>
 
   <script src="/_env.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.min.js"></script>
   <script type="module">
-    import { supabase, getProfile } from '/src/core/supabase.js';
+    import { createSupabaseClient, getProfile } from '/src/core/supabase.js';
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    const supabaseClient = createSupabaseClient(createClient);
     const statusEl = document.getElementById('status');
     function setStatus(msg){ if(statusEl) statusEl.textContent = msg; }
     (async function bootstrap(){
       try {
         setStatus('Carregando sessão...');
-        const { data } = await supabase.auth.getUser();
+        const { data } = await supabaseClient.auth.getUser();
         const user = data?.user || null;
         if (!user) { setStatus('Nenhuma sessão encontrada. Redirecionando para login...'); return window.location.replace('/login.html'); }
         setStatus('Recuperando perfil...');
-        const profile = await getProfile(user.id);
-        if (!profile) { setStatus('Perfil não encontrado. Finalizando sessão e redirecionando...'); await supabase.auth.signOut(); return window.location.replace('/login.html'); }
+        const profile = await getProfile(supabaseClient, user.id);
+        if (!profile) { setStatus('Perfil não encontrado. Finalizando sessão e redirecionando...'); await supabaseClient.auth.signOut(); return window.location.replace('/login.html'); }
         if (profile.role === 'superadmin') { setStatus('Bem-vindo administrador. Redirecionando...'); return window.location.replace('/admin.html'); }
         else { setStatus('Bem-vindo. Redirecionando...'); return window.location.replace('/user.html'); }
       } catch (err) {
         console.error('Erro ao validar sessão:', err);
-        try { await supabase.auth.signOut(); } catch (_) {}
+        try { await supabaseClient.auth.signOut(); } catch (_) {}
         return window.location.replace('/login.html');
       }
     })();

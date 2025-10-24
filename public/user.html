@@ -9,7 +9,7 @@
 <body class="theme-dark">
   <main class="user-root" style="padding:24px">
     <header class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <div class="brand" style="display:flex;align-items:center;gap:12px">
+      <div class="brand" style="display:flex; align-items:center; gap:12px">
         <img src="/assets/logo.png" alt="logo" class="brand-logo" />
         <h1 style="margin:0;font-size:18px">CMS.PANDDA — Área do Usuário</h1>
       </div>
@@ -24,28 +24,31 @@
   </main>
 
   <script src="/_env.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.min.js"></script>
   <script type="module">
-    import { supabase, getProfile } from '/src/core/supabase.js';
+    import { createSupabaseClient, getProfile } from '/src/core/supabase.js';
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    const supabaseClient = createSupabaseClient(createClient);
+
     async function protectUser() {
       try {
-        const { data } = await supabase.auth.getUser();
+        const { data } = await supabaseClient.auth.getUser();
         const user = data?.user || null;
         if (!user) return window.location.replace('/login.html');
-        const profile = await getProfile(user.id);
-        if (!profile) { await supabase.auth.signOut(); return window.location.replace('/login.html'); }
+        const profile = await getProfile(supabaseClient, user.id);
+        if (!profile) { await supabaseClient.auth.signOut(); return window.location.replace('/login.html'); }
         document.getElementById('user-content').innerHTML = `
           <p>Olá, <strong>${profile.email || profile.id}</strong></p>
           <p>Role: <strong>${profile.role || 'user'}</strong></p>
         `;
       } catch (err) {
         console.error(err);
-        await supabase.auth.signOut();
+        await supabaseClient.auth.signOut();
         window.location.replace('/login.html');
       }
     }
     document.getElementById('btn-logout').addEventListener('click', async () => {
-      await supabase.auth.signOut();
+      await supabaseClient.auth.signOut();
       window.location.replace('/login.html');
     });
     protectUser();

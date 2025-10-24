@@ -24,17 +24,20 @@
   </main>
 
   <script src="/_env.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.min.js"></script>
   <script type="module">
-    import { supabase, getProfile } from '/src/core/supabase.js';
+    import { createSupabaseClient, getProfile } from '/src/core/supabase.js';
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    const supabaseClient = createSupabaseClient(createClient);
+
     async function protectAdmin() {
       try {
-        const { data } = await supabase.auth.getUser();
+        const { data } = await supabaseClient.auth.getUser();
         const user = data?.user || null;
         if (!user) return window.location.replace('/login.html');
-        const profile = await getProfile(user.id);
+        const profile = await getProfile(supabaseClient, user.id);
         if (!profile || profile.role !== 'superadmin') {
-          await supabase.auth.signOut();
+          await supabaseClient.auth.signOut();
           return window.location.replace('/login.html');
         }
         document.getElementById('admin-content').innerHTML = `
@@ -43,12 +46,12 @@
         `;
       } catch (err) {
         console.error(err);
-        await supabase.auth.signOut();
+        await supabaseClient.auth.signOut();
         window.location.replace('/login.html');
       }
     }
     document.getElementById('btn-logout').addEventListener('click', async () => {
-      await supabase.auth.signOut();
+      await supabaseClient.auth.signOut();
       window.location.replace('/login.html');
     });
     protectAdmin();

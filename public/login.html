@@ -10,47 +10,75 @@
   <main>
     <img src="/assets/logo.png" alt="Logo" />
     <form id="login-form">
-      <input type="email" id="email" placeholder="Email" required />
-      <input type="password" id="password" placeholder="Senha" required />
-      <button type="submit">Entrar</button>
+      <input type="email" name="email" id="email" placeholder="Email" required />
+      <input type="password" name="password" id="password" placeholder="Senha" required />
+      <button type="submit" id="submit-btn">Entrar</button>
+      <div id="login-error" class="error" role="status" aria-live="polite"></div>
     </form>
   </main>
 
   <script src="/_env.js"></script>
-
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+    import { createSupabaseClient, getProfile, signIn } from '/src/core/supabase.js';
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-    const supabase = createClient(
-      window.__ENV.SUPABASE_URL,
-      window.__ENV.SUPABASE_ANON_KEY
-    )
+    const supabaseClient = createSupabaseClient(createClient);
 
-    const form = document.getElementById('login-form')
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault()
-      const email = document.getElementById('email').value
-      const password = document.getElementById('password').value
+    const form = document.getElementById('login-form');
+    const errEl = document.getElementById('login-error');
+    const submitBtn = document.getElementById('submit-btn');
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
-      if (error) {
-        alert('Erro ao entrar: ' + error.message)
-      } else {
-        const { data: { user } } = await supabase.auth.getUser()
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-
-        if (profile?.role === 'admin') {
-          window.location.replace('/admin.html')
-        } else {
-          window.location.replace('/user.html')
-        }
+    function setLoading(on){
+      if (submitBtn) {
+        submitBtn.disabled = on;
+        submitBtn.textContent = on ? 'Entrando...' : 'Entrar';
       }
-    })
+    }
+    function showError(message){
+      if (errEl) errEl.textContent = message || '';
+    }
+
+    async function handlePostLogin(user){
+      const profile = await getProfile(supabaseClient, user.id);
+      if(!profile){
+        showError('Perfil não encontrado. Contate o administrador.');
+        await supabaseClient.auth.signOut();
+        return;
+      }
+      if(profile.role === 'superadmin') window.location.href = '/admin.html';
+      else window.location.href = '/user.html';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showError('');
+      setLoading(true);
+      const email = form.email.value.trim();
+      const password = form.password.value;
+      if(!email || !password){
+        showError('Preencha email e senha.');
+        setLoading(false);
+        return;
+      }
+      try{
+        const res = await signIn(supabaseClient, email, password);
+        const user = res?.user ?? null;
+        if(!user) throw new Error('Resposta de autenticação inválida');
+        await handlePostLogin(user);
+      }catch(err){
+        showError(err?.message || 'Falha no login');
+      }finally{
+        setLoading(false);
+      }
+    });
+
+    (async function checkSession(){
+      try{
+        const { data } = await supabaseClient.auth.getUser();
+        const user = data?.user || null;
+        if(user) await handlePostLogin(user);
+      }catch(_){}
+    })();
   </script>
 </body>
 </html>
