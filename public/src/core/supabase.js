@@ -23,9 +23,9 @@ export async function getCurrentUser(supabaseClient) {
   return res?.data?.user ?? null;
 }
 
-// Usa a tabela 'profiles' padronizada
+// Alterado para consultar a tabela 'users'
 export async function getProfile(supabaseClient, id) {
-  const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', id).single();
+  const { data, error } = await supabaseClient.from('users').select('*').eq('id', id).single();
   if (error) throw error;
   return data ?? null;
 }
