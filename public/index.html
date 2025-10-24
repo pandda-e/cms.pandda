@@ -3,8 +3,42 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Login - CMS Pandda</title>
+  <title>CMS.PANDDA</title>
+  <link rel="stylesheet" href="/src/entities/login/login.css" />
 </head>
-<body>
-  </body>
+<body class="theme-dark">
+  <main style="display:flex;align-items:center;justify-content:center;height:100vh;padding:24px">
+    <div style="text-align:center;color:var(--text);max-width:520px">
+      <img src="/assets/logo.png" alt="logo" style="width:72px;height:72px;display:block;margin:0 auto 12px" />
+      <h1 style="margin:0 0 8px">CMS.PANDDA</h1>
+      <p style="margin:0 0 18px;color:var(--muted)">Verificando sessão… você será redirecionado em instantes.</p>
+      <div id="status" style="color:var(--muted)"></div>
+    </div>
+  </main>
+
+  <script src="/_env.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.min.js"></script>
+  <script type="module">
+    import { supabase, getProfile } from '/src/core/supabase.js';
+    const statusEl = document.getElementById('status');
+    function setStatus(msg){ if(statusEl) statusEl.textContent = msg; }
+    (async function bootstrap(){
+      try {
+        setStatus('Carregando sessão...');
+        const { data } = await supabase.auth.getUser();
+        const user = data?.user || null;
+        if (!user) { setStatus('Nenhuma sessão encontrada. Redirecionando para login...'); return window.location.replace('/login.html'); }
+        setStatus('Recuperando perfil...');
+        const profile = await getProfile(user.id);
+        if (!profile) { setStatus('Perfil não encontrado. Finalizando sessão e redirecionando...'); await supabase.auth.signOut(); return window.location.replace('/login.html'); }
+        if (profile.role === 'superadmin') { setStatus('Bem-vindo administrador. Redirecionando...'); return window.location.replace('/admin.html'); }
+        else { setStatus('Bem-vindo. Redirecionando...'); return window.location.replace('/user.html'); }
+      } catch (err) {
+        console.error('Erro ao validar sessão:', err);
+        try { await supabase.auth.signOut(); } catch (_) {}
+        return window.location.replace('/login.html');
+      }
+    })();
+  </script>
+</body>
 </html>

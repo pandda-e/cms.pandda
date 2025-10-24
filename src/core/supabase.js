@@ -1,20 +1,57 @@
 // src/core/supabase.js
-// Inicializa e exporta o cliente Supabase para todo o app.
-// Compatível com window.__ENV (gerado em build) ou import.meta.env (Vite).
+// Compatível com SDK via CDN (window.supabase)
+const SUPABASE_URL = window.__ENV?.SUPABASE_URL || window?.SUPABASE_URL || process.env?.SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.__ENV?.SUPABASE_ANON_KEY || window?.SUPABASE_ANON_KEY || process.env?.SUPABASE_ANON_KEY;
 
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error('Missing Supabase config. Ensure public/_env.js or env vars are set.');
+}
 
-// Tenta ler variáveis da janela gerada em build
-const urlFromWindow = (typeof window !== 'undefined' && window.__ENV && window.__ENV.SUPABASE_URL) ? window.__ENV.SUPABASE_URL : null;
-const keyFromWindow = (typeof window !== 'undefined' && window.__ENV && window.__ENV.SUPABASE_ANON_KEY) ? window.__ENV.SUPABASE_ANON_KEY : null;
+const createClientFn = window?.supabase?.createClient;
+if (!createClientFn) {
+  throw new Error('Supabase SDK not found on window.supabase. Include CDN script before this module.');
+}
 
-// Tenta ler variáveis do ambiente (Vite)
-const urlFromVite = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_URL) ? import.meta.env.VITE_SUPABASE_URL : null;
-const keyFromVite = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_ANON_KEY) ? import.meta.env.VITE_SUPABASE_ANON_KEY : null;
+export const supabase = createClientFn(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Prioridade: window.__ENV -> import.meta.env -> string vazia
-const SUPABASE_URL = urlFromWindow || urlFromVite || '';
-const SUPABASE_ANON_KEY = keyFromWindow || keyFromVite || '';
+export async function getCurrentUser() {
+  const res = await supabase.auth.getUser();
+  return res?.data?.user ?? null;
+}
 
-// Exporta cliente Supabase para uso pelos módulos de entidade
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export async function getProfile(id) {
+  const { data, error } = await supabase.from('users').select('*').eq('id', id).single();
+  if (error) throw error;
+  return data ?? null;
+}
+
+export async function isSuperadmin(id) {
+  const profile = await getProfile(id);
+  return profile?.role === 'superadmin';
+}
+
+export async function signIn(email, password) {
+  const res = await supabase.auth.signInWithPassword({ email, password });
+  if (res.error) throw res.error;
+  return { user: res?.data?.user ?? null, session: res?.data?.session ?? null };
+}
+
+export async function signUp(email, password) {
+  const res = await supabase.auth.signUp({ email, password });
+  if (res.error) throw res.error;
+  return { user: res?.data?.user ?? null, session: res?.data?.session ?? null };
+}
+
+export async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+export function onAuthStateChange(cb) {
+  const sub = supabase.auth.onAuthStateChange((event, session) => {
+    try { cb(event, session); } catch (_) {}
+  });
+  return () => {
+    try { sub?.data?.subscription?.unsubscribe?.(); } catch (_) {}
+  };
+}

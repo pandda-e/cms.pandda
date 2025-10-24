@@ -3,30 +3,42 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Login - CMS Pandda</title>
+  <title>Login — CMS.PANDDA</title>
   <link rel="stylesheet" href="/src/entities/login/login.css" />
 </head>
-<body>
-  <main class="login-page">
-    <section class="login-card">
-      <h1>CMS Pandda</h1>
-      <form id="loginForm">
-        <label for="email">E-mail</label>
-        <input id="email" type="email" required />
-        <label for="password">Senha</label>
-        <input id="password" type="password" required />
-        <div class="actions">
-          <button type="submit">Entrar</button>
-          <button id="themeToggle" type="button">Alternar tema</button>
+<body class="theme-dark">
+  <main class="login-root">
+    <section class="login-card" role="main" aria-labelledby="login-title">
+      <header class="login-header">
+        <div class="brand">
+          <img src="/assets/logo.png" alt="logo" class="brand-logo" />
+          <h1 id="login-title">CMS.PANDDA</h1>
         </div>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Alternar tema">
+          <span class="icon">🌙</span>
+        </button>
+      </header>
+
+      <form id="login-form" class="login-form" autocomplete="off" novalidate>
+        <label for="email" class="label">Email</label>
+        <input id="email" name="email" type="email" inputmode="email" autocomplete="username" required />
+
+        <label for="password" class="label">Senha</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+        <button id="submit-btn" class="btn primary" type="submit">Entrar</button>
+
+        <div id="login-error" class="error" role="alert" aria-live="polite"></div>
       </form>
-      <p class="hint">Use credenciais de admin ou superadmin</p>
+
+      <footer class="login-footer">
+        <small>Somente usuários autorizados</small>
+      </footer>
     </section>
   </main>
 
   <script src="/_env.js"></script>
-  <script type="module" src="/src/core/supabase.js"></script>
-  <script type="module" src="/src/core/theme.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.min.js"></script>
   <script type="module" src="/src/entities/login/login.js"></script>
 </body>
 </html>
