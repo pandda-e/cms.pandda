@@ -11,9 +11,9 @@
 </head>
 <body class="theme-dark">
   <div id="app" class="app-root">
-    <aside id="sidebar-container" class="sidebar-container"></aside>
+    <aside id="sidebar-container" class="sidebar-container" aria-hidden="true"></aside>
     <div class="main-area">
-      <header id="topbar-container" class="topbar-container"></header>
+      <header id="topbar-container" class="topbar-container" aria-hidden="true"></header>
       <main id="view-root" class="view-root" role="main" aria-live="polite"></main>
     </div>
   </div>
@@ -22,16 +22,28 @@
   <script type="module">
     import { createSupabaseClient } from '/src/core/supabase.js';
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-    import { initialize as initSession, getState } from '/js/auth/session.js';
-    import '/js/components/sidebar.js';
-    import '/js/components/topbar.js';
-    import '/js/app.js';
+    import { initialize as initSession, getState, clearSession } from '/js/auth/session.js';
 
-    const supabaseClient = createSupabaseClient(createClient);
-    await initSession(supabaseClient);
+    async function bootstrap() {
+      const supabaseClient = createSupabaseClient(createClient);
+      window.__SUPABASE_CLIENT = supabaseClient;
+      try {
+        await initSession(supabaseClient);
+        const s = getState();
+        if (!s.user) return window.location.replace('/login.html');
 
-    const s = getState();
-    if(!s.user) return window.location.href = '/login.html';
+        // now import components and router
+        await import('/js/components/sidebar.js');
+        await import('/js/components/topbar.js');
+        await import('/js/app.js');
+      } catch (err) {
+        console.error('user bootstrap error', err);
+        try { await clearSession(); } catch(_) {}
+        return window.location.replace('/login.html');
+      }
+    }
+
+    bootstrap();
   </script>
 </body>
 </html>

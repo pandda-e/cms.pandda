@@ -3,90 +3,52 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Login — Pandda</title>
+  <title>Admin — Pandda</title>
   <link rel="stylesheet" href="/css/globals.css" />
-  <link rel="stylesheet" href="/src/entities/login/login.css" />
+  <link rel="stylesheet" href="/css/theme.css" />
+  <link rel="stylesheet" href="/css/topbar.css" />
+  <link rel="stylesheet" href="/css/sidebar.css" />
 </head>
 <body class="theme-dark">
-  <main class="login-root">
-    <div class="login-card card" style="width:100%;max-width:420px">
-      <div class="login-header">
-        <div class="brand">
-          <div class="brand-logo" aria-hidden="true"></div>
-          <h1>Entrar</h1>
-        </div>
-        <button id="theme-toggle" class="theme-toggle" aria-label="Alternar tema"><span class="icon">🌓</span></button>
-      </div>
-
-      <form id="login-form" class="login-form" novalidate>
-        <label class="label">Email</label>
-        <input type="email" name="email" id="email" placeholder="seu@exemplo.com" required />
-        <label class="label">Senha</label>
-        <input type="password" name="password" id="password" placeholder="Senha" required />
-        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-          <button type="submit" id="submit-btn" class="btn primary">Entrar</button>
-          <div id="login-error" class="error" role="status" aria-live="polite"></div>
-        </div>
-      </form>
+  <div id="app" class="app-root">
+    <aside id="sidebar-container" class="sidebar-container" aria-hidden="true"></aside>
+    <div class="main-area">
+      <header id="topbar-container" class="topbar-container" aria-hidden="true"></header>
+      <main id="view-root" class="view-root" role="main" aria-live="polite"></main>
     </div>
-  </main>
+  </div>
 
   <script src="/_env.js"></script>
   <script type="module">
     import { createSupabaseClient } from '/src/core/supabase.js';
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-    import { initialize as initSession, signIn as sessionSignIn } from '/js/auth/session.js';
+    import { initialize as initSession, getState, clearSession } from '/js/auth/session.js';
 
-    const supabaseClient = createSupabaseClient(createClient);
-    await initSession(supabaseClient);
+    async function bootstrap() {
+      const supabaseClient = createSupabaseClient(createClient);
+      window.__SUPABASE_CLIENT = supabaseClient;
+      try {
+        await initSession(supabaseClient);
+        const s = getState();
+        if (!s.user) return window.location.replace('/login.html');
+        if (!s.isSuper) {
+          // force sign out and redirect to login if not allowed
+          await clearSession();
+          return window.location.replace('/login.html');
+        }
 
-    const form = document.getElementById('login-form');
-    const errEl = document.getElementById('login-error');
-    const submitBtn = document.getElementById('submit-btn');
-    const themeToggle = document.getElementById('theme-toggle');
-
-    function setLoading(on){
-      submitBtn.disabled = on;
-      submitBtn.textContent = on ? 'Entrando...' : 'Entrar';
-    }
-    function showError(msg){ errEl.textContent = msg || ''; }
-
-    themeToggle?.addEventListener('click', ()=>{
-      const cur = document.documentElement.getAttribute('data-theme') || (document.body.classList.contains('theme-dark') ? 'dark' : 'light');
-      const next = cur === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      if(next === 'light'){ document.body.classList.remove('theme-dark'); document.body.classList.add('theme-light'); }
-      else { document.body.classList.remove('theme-light'); document.body.classList.add('theme-dark'); }
-      localStorage.setItem('cms_pandda_theme', next);
-    });
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      showError('');
-      setLoading(true);
-      const email = form.email.value.trim();
-      const password = form.password.value;
-      if(!email || !password){ showError('Preencha email e senha.'); setLoading(false); return; }
-      try{
-        // session.signIn will call core signIn and populate profile state
-        await sessionSignIn(email, password);
-        const state = (await import('/js/auth/session.js')).getState();
-        if(state.isSuper) window.location.href = '/admin.html';
-        else window.location.href = '/user.html';
-      }catch(err){
-        showError(err?.message || 'Falha no login');
-      }finally{ setLoading(false); }
-    });
-
-    // if already signed in, redirect to appropriate area
-    (async function check(){
-      const { getState } = await import('/js/auth/session.js');
-      const s = getState();
-      if(s.user){
-        if(s.isSuper) window.location.href = '/admin.html';
-        else window.location.href = '/user.html';
+        // Only after session is ready import UI components and router
+        await import('/js/components/sidebar.js');
+        await import('/js/components/topbar.js');
+        await import('/js/app.js');
+      } catch (err) {
+        console.error('admin bootstrap error', err);
+        try { await clearSession(); } catch(_) {}
+        return window.location.replace('/login.html');
       }
-    })();
+    }
+
+    bootstrap();
   </script>
 </body>
 </html>

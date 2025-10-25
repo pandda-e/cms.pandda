@@ -1,29 +1,19 @@
 // public/js/components/topbar.js
-// Versão robusta: confirma existência do botão, faz fallback para signOut no cliente Supabase
-import { getState, onChange, clearSession, getState as _getState } from '/js/auth/session.js';
+import { getState, onChange, clearSession } from '/js/auth/session.js';
 
 const container = document.getElementById('topbar-container');
-let onChangeUnsub = null;
+let mounted = false;
 
-async function loadTemplate() {
-  try {
-    const tpl = await fetch('/views/layout/topbar.html').then(r=>r.text());
-    if (!container) {
-      console.warn('topbar: host element #topbar-container not found');
-      return;
-    }
-    container.innerHTML = tpl;
-    wire();
-    renderUser();
+async function mountTopbar(){
+  if (!container) { console.warn('topbar: container not found'); return; }
+  const tpl = await fetch('/views/layout/topbar.html').then(r=>r.text());
+  container.innerHTML = tpl;
+  container.querySelectorAll && wire();
+  renderUser();
 
-    if (!onChangeUnsub) {
-      onChangeUnsub = onChange(() => {
-        try { renderUser(); } catch (e) { console.error(e); }
-      });
-    }
-  } catch (err) {
-    console.error('topbar.loadTemplate error', err);
-  }
+  // subscribe once
+  onChange(renderUser);
+  mounted = true;
 }
 
 function wire(){
@@ -49,60 +39,33 @@ function wire(){
     });
   }
 
-  // Robust logout: ensure handler exists even if template reloaded; use event delegation fallback
-  if (btnLogout) {
-    btnLogout.addEventListener('click', handleLogout);
-  } else {
-    // fallback: delegated handler on container (covers dynamic changes)
-    container.addEventListener('click', (ev) => {
-      const target = ev.target.closest && ev.target.closest('#btn-logout');
-      if (target) handleLogout(ev);
-    });
-  }
-
-  // second fallback: global delegated handler (covers overlays and other fragments)
-  document.addEventListener('click', (ev) => {
-    const target = ev.target.closest && ev.target.closest('#btn-logout');
-    if (target) handleLogout(ev);
-  });
-}
-
-async function handleLogout(ev) {
-  try {
-    if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
-  } catch (_) {}
-
-  console.info('Logout requested');
-
-  try {
-    // primary: try session.clearSession()
-    await clearSession();
-    console.info('Session cleared via clearSession()');
-  } catch (err) {
-    console.warn('clearSession() failed:', err);
-    // try to call any global supabase client signOut as fallback
+  async function handleLogout(ev) {
+    try { ev?.preventDefault(); } catch(_) {}
     try {
-      if (window.__SUPABASE_CLIENT && typeof window.__SUPABASE_CLIENT.auth?.signOut === 'function') {
-        await window.__SUPABASE_CLIENT.auth.signOut();
-        console.info('Fallback: supabaseClient.auth.signOut() succeeded');
-      }
-    } catch (err2) {
-      console.warn('Fallback supabase signOut failed:', err2);
-    }
-  } finally {
-    // ensure redirect happens regardless
-    try {
+      await clearSession();
+      console.info('topbar: clearSession completed');
+    } catch (err) {
+      console.warn('topbar logout error', err);
+      try { if(window.__SUPABASE_CLIENT) await window.__SUPABASE_CLIENT.auth.signOut(); } catch(_){}
+    } finally {
       window.location.href = '/login.html';
-    } catch (e) {
-      console.error('Redirect to /login.html failed', e);
     }
   }
+
+  if (btnLogout) btnLogout.addEventListener('click', handleLogout);
+
+  // global delegated fallback
+  document.addEventListener('click', (ev) => {
+    const t = ev.target.closest && ev.target.closest('#btn-logout');
+    if (t) handleLogout(ev);
+  });
 }
 
 function renderUser(){
   const emailEl = container.querySelector && container.querySelector('#user-email');
-  const s = _getState();
+  const s = getState();
+  if (!container) return;
   if (emailEl) emailEl.textContent = s.user?.email || '—';
 }
 
-loadTemplate();
+mountTopbar().catch(err => console.error('mountTopbar error', err));

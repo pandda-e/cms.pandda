@@ -1,7 +1,4 @@
 // public/js/auth/session.js
-// Integração com src/core/supabase.js (usa createSupabaseClient in caller)
-// Exporta: initialize(supabaseClient), signIn(email,password), signOut(), getState(), getUser(), isSuperAdmin(), getAdminId(), onChange(), setSession(), clearSession()
-
 import {
   getProfile as coreGetProfile,
   signIn as coreSignIn,
@@ -86,7 +83,21 @@ export function setSession({ token=null, user=null, adminId=null, isSuper=false,
 }
 
 export async function clearSession(){
-  try { if(_supabase) await _supabase.auth.signOut(); } catch(_) {}
+  // try to sign out using the registered client first
+  try {
+    if (_supabase && _supabase.auth && typeof _supabase.auth.signOut === 'function') {
+      await _supabase.auth.signOut();
+      console.info('session.clearSession: signed out via internal _supabase');
+    } else if (window.__SUPABASE_CLIENT && window.__SUPABASE_CLIENT.auth && typeof window.__SUPABASE_CLIENT.auth.signOut === 'function') {
+      await window.__SUPABASE_CLIENT.auth.signOut();
+      console.info('session.clearSession: signed out via window.__SUPABASE_CLIENT fallback');
+    } else {
+      console.info('session.clearSession: no supabase client available to sign out remotely');
+    }
+  } catch (err) {
+    console.warn('session.clearSession: signOut attempt failed', err);
+  }
+
   _state = { token:null, user:null, adminId:null, isSuper:false, permissions:[] };
   try { localStorage.removeItem(STORAGE_KEY); } catch(_) {}
   notify();
@@ -116,17 +127,8 @@ async function populateFromUser(user, sessionObj = null){
 
 async function tryGetAccessToken(){
   try {
+    if (!_supabase) return null;
     const { data } = await _supabase.auth.getSession();
     return data?.session?.access_token ?? null;
   } catch (_) { return null; }
 }
-
-// auto-init if legacy window client is set (optional)
-(async function autoInitIfPossible(){
-  try {
-    if(typeof window !== 'undefined' && window.__SUPABASE_CLIENT && !(_supabase)) {
-      // do not await here to avoid blocking module load; caller should still call initialize explicitly
-      // await initialize(window.__SUPABASE_CLIENT);
-    }
-  } catch(_) {}
-})();

@@ -11,12 +11,13 @@
 </head>
 <body class="theme-dark">
   <div id="app" class="app-root">
-    <aside id="sidebar-container" class="sidebar-container"></aside>
+    <aside id="sidebar-container" class="sidebar-container" aria-hidden="true"></aside>
     <div class="main-area">
-      <header id="topbar-container" class="topbar-container"></header>
+      <header id="topbar-container" class="topbar-container" aria-hidden="true"></header>
       <main id="view-root" class="view-root" role="main" aria-live="polite">
         <section class="placeholder">
-          <h1>Carregando painel…</h1>
+          <h1>Verificando sessão…</h1>
+          <p class="small" id="boot-status">Aguarde</p>
         </section>
       </main>
     </div>
@@ -26,22 +27,42 @@
   <script type="module">
     import { createSupabaseClient } from '/src/core/supabase.js';
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-    import { initialize as initSession } from '/js/auth/session.js';
-    import '/js/components/sidebar.js';
-    import '/js/components/topbar.js';
-    import '/js/app.js';
+    import { initialize as initSession, getState } from '/js/auth/session.js';
 
-    (async function bootstrap(){
-      const supabaseClient = createSupabaseClient(createClient);
-      // expose client for debug/legacy modules if needed
-      window.__SUPABASE_CLIENT = supabaseClient;
+    const statusEl = document.getElementById('boot-status');
+
+    async function bootstrap() {
       try {
+        const supabaseClient = createSupabaseClient(createClient);
+        window.__SUPABASE_CLIENT = supabaseClient; // fallback for older modules
+
+        statusEl.textContent = 'Inicializando sessão...';
         await initSession(supabaseClient);
+        const s = getState();
+
+        // If no user, go to login
+        if (!s.user) {
+          statusEl.textContent = 'Nenhuma sessão ativa. Redirecionando para login...';
+          return window.location.replace('/login.html');
+        }
+
+        // If superadmin go to admin area; else user area
+        if (s.isSuper) {
+          statusEl.textContent = 'Administrador detectado. Redirecionando...';
+          return window.location.replace('/admin.html');
+        } else {
+          statusEl.textContent = 'Usuário detectado. Redirecionando...';
+          return window.location.replace('/user.html');
+        }
       } catch (err) {
-        console.warn('session init failed', err);
+        console.error('bootstrap error', err);
+        try { statusEl.textContent = 'Erro ao validar sessão. Redirecionando para login...'; } catch(_) {}
+        try { await window.__SUPABASE_CLIENT?.auth?.signOut(); } catch(_) {}
+        return window.location.replace('/login.html');
       }
-      // app.js router will run on load event
-    })();
+    }
+
+    bootstrap();
   </script>
 </body>
 </html>
