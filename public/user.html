@@ -20,42 +20,43 @@
 
   <script src="/_env.js"></script>
   <script type="module">
-  import { createSupabaseClient } from '/src/core/supabase.js';
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-  import { initialize as initSession, getState, clearSession } from '/js/auth/session.js';
-
-  if (!window.__PANDDA_BOOTSTRAPPED_USER) {
-    window.__PANDDA_BOOTSTRAPPED_USER = true;
-
-    async function bootstrapUser() {
-      const supabaseClient = createSupabaseClient(createClient);
-      window.__SUPABASE_CLIENT = supabaseClient;
+    import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
       try {
-        await initSession(supabaseClient);
-        const s = getState();
-        if (!s.user) {
-          console.warn('user bootstrap: sem user — redirect to login');
+        if (window.__PANDDA_BOOTSTRAPPED_USER) return;
+        window.__PANDDA_BOOTSTRAPPED_USER = true;
+
+        const createClient = sdk.createClient;
+        const { createSupabaseClient } = await import('/src/core/supabase.js');
+        const sessionMod = await import('/js/auth/session.js');
+
+        const sup = createSupabaseClient(createClient);
+        window.__SUPABASE_CLIENT = sup;
+
+        const initPromise = sessionMod.initialize(sup);
+        const initRes = await Promise.race([
+          initPromise,
+          new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 7000))
+        ]).catch(e => ({ __initError: true, message: e?.message }));
+
+        const user = initRes?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
+
+        if (!user) {
           if (location.pathname !== '/login.html') location.replace('/login.html');
           return;
         }
 
-        // session ok — carregar UI
+        // sessão ok: carregar UI
         await import('/js/components/sidebar.js');
         await import('/js/components/topbar.js');
         await import('/js/app.js');
       } catch (err) {
-        console.error('user bootstrap error', err);
-        try { await clearSession(); } catch (_) {}
+        try { await (await import('/js/auth/session.js')).clearSession?.(); } catch(_) {}
         if (location.pathname !== '/login.html') location.replace('/login.html');
       }
-    }
-
-    bootstrapUser();
-  } else {
-    console.info('user bootstrap skipped: already bootstrapped');
-  }
-</script>
-
-
+    }).catch(err => {
+      console.error('user bootstrap failed', err);
+      if (location.pathname !== '/login.html') location.replace('/login.html');
+    });
+  </script>
 </body>
 </html>

@@ -1,9 +1,9 @@
-// public/src/core/supabase.js
-// Memoized createSupabaseClient to avoid multiple GoTrueClient instances
+// src/core/supabase.js
+// Memoized createSupabaseClient to avoid multiple GoTrueClient instances and avoid throwing at import time.
+
 export function createSupabaseClient(createClientFn) {
   if (!createClientFn) throw new Error('Supabase createClient function not provided.');
 
-  // reuse global client if already created
   if (typeof window !== 'undefined' && window.__SUPABASE_CLIENT) {
     return window.__SUPABASE_CLIENT;
   }
@@ -17,13 +17,10 @@ export function createSupabaseClient(createClientFn) {
 
   const client = createClientFn(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // store on window for reuse across modules/pages
-  try { window.__SUPABASE_CLIENT = client; } catch (_){}
+  try { window.__SUPABASE_CLIENT = client; } catch (_) {}
 
   return client;
 }
-
-export const supabase = null;
 
 export async function getCurrentUser(supabaseClient) {
   if (!supabaseClient) return null;

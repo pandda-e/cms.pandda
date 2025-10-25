@@ -1,6 +1,5 @@
 // public/js/auth/session.js
-// Robust session manager integrated with src/core/supabase.js
-// Exports: initialize(supabaseClient), signIn(email,password), signOut(), clearSession(), getState(), onChange(), getUser(), isSuperAdmin(), getToken(), getAdminId()
+// Robust session manager that requires explicit initialize(supabaseClient).
 
 import {
   getProfile as coreGetProfile,
@@ -23,7 +22,6 @@ let _state = {
 
 function log(...args){ try { console.info('[session]', ...args); } catch(_){} }
 function warn(...args){ try { console.warn('[session]', ...args); } catch(_){} }
-function error(...args){ try { console.error('[session]', ...args); } catch(_){} }
 
 function notify(){ for(const fn of listeners) try{ fn(getState()); } catch(e){ console.error(e); } }
 function save(){ try { localStorage.setItem(STORAGE_KEY, JSON.stringify(_state)); } catch(e){ warn('save failed', e); } }
@@ -37,7 +35,6 @@ export function hasPermission(p){ return _state.permissions?.includes(p); }
 export function getToken(){ return _state.token; }
 export function onChange(fn){ listeners.add(fn); return ()=>listeners.delete(fn); }
 
-// initialize must be called with a created supabase client
 export async function initialize(supabaseClient, opts = { retries: 2, retryDelayMs: 350 }) {
   if (_initialized) {
     log('initialize: already initialized');
@@ -45,7 +42,6 @@ export async function initialize(supabaseClient, opts = { retries: 2, retryDelay
   }
   if (_initializing) {
     log('initialize: already initializing, waiting...');
-    // wait until finished (poll)
     const start = Date.now();
     while (_initializing && Date.now() - start < 10000) {
       await new Promise(r => setTimeout(r, 100));
@@ -59,7 +55,6 @@ export async function initialize(supabaseClient, opts = { retries: 2, retryDelay
 
   load();
 
-  // attempt to read session from supabase SDK, with retries
   const { retries, retryDelayMs } = opts;
   let attempt = 0;
   let sdkSession = null;
@@ -77,7 +72,6 @@ export async function initialize(supabaseClient, opts = { retries: 2, retryDelay
     }
   }
 
-  // if getSession returned nothing, try getUser as fallback
   let sdkUser = null;
   try {
     const gu = await _supabase.auth.getUser();
@@ -87,27 +81,23 @@ export async function initialize(supabaseClient, opts = { retries: 2, retryDelay
     warn('sup.auth.getUser failed', err);
   }
 
-  // Choose user: prefer sdkSession.user, then sdkUser, then local stored _state.user
   const userFromSdk = sdkSession?.user ?? sdkUser ?? _state.user ?? null;
 
   if (!userFromSdk) {
     log('no user found in supabase SDK; clearing local state and returning');
-    // ensure local state cleared to avoid "stuck verifying" UI
     _state = { token: null, user: null, adminId: null, isSuper: false, permissions: [] };
     try { localStorage.removeItem(STORAGE_KEY); } catch(_) {}
-    notify();
     _initialized = true;
     _initializing = false;
+    notify();
     return getState();
   }
 
-  // populate state from the found user
   try {
     await populateFromUser(userFromSdk, sdkSession);
     log('populateFromUser succeeded');
   } catch (err) {
     warn('populateFromUser failed', err);
-    // still mark initialized and notify so UI won't block
     notify();
   }
 
@@ -117,7 +107,6 @@ export async function initialize(supabaseClient, opts = { retries: 2, retryDelay
   return getState();
 }
 
-// signIn helper uses coreSignIn(supabaseClient,...)
 export async function signIn(email, password) {
   if (!_supabase) throw new Error('session not initialized. call initialize(supabaseClient) first.');
   const res = await coreSignIn(_supabase, email, password);
@@ -141,7 +130,6 @@ export function setSession({ token=null, user=null, adminId=null, isSuper=false,
 }
 
 export async function clearSession() {
-  // attempt signOut via registered client first
   try {
     if (_supabase && _supabase.auth && typeof _supabase.auth.signOut === 'function') {
       await _supabase.auth.signOut();
@@ -161,7 +149,6 @@ export async function clearSession() {
   notify();
 }
 
-// internal: populate state reading profile and optionally session
 async function populateFromUser(user, sessionObj = null) {
   if (!user) throw new Error('populateFromUser requires a user object');
 
@@ -170,7 +157,6 @@ async function populateFromUser(user, sessionObj = null) {
 
   try {
     if (!_supabase) throw new Error('populateFromUser needs _supabase client');
-    // fetch profile from DB
     const profile = await coreGetProfile(_supabase, user.id);
     _state.isSuper = profile?.role === 'superadmin';
     _state.adminId = profile?.administrador_id || profile?.admin_id || profile?.administrador || null;
@@ -199,6 +185,3 @@ async function tryGetAccessToken(){
     return null;
   }
 }
-
-// auto-init guard: if somebody set window.__SUPABASE_CLIENT and forgot to call initialize, do not auto-initialize.
-// This module requires explicit initialize(supabaseClient) to be called by bootstrap.
