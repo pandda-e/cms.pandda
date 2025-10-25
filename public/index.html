@@ -25,44 +25,64 @@
 
   <script src="/_env.js"></script>
   <script type="module">
-    import { createSupabaseClient } from '/src/core/supabase.js';
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-    import { initialize as initSession, getState } from '/js/auth/session.js';
+  import { createSupabaseClient } from '/src/core/supabase.js';
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+  import { initialize as initSession, getState } from '/js/auth/session.js';
 
-    const statusEl = document.getElementById('boot-status');
+  const statusEl = document.getElementById('boot-status');
+
+  // evita múltiplos bootstraps
+  if (!window.__PANDDA_BOOTSTRAPPED) {
+    window.__PANDDA_BOOTSTRAPPED = true;
 
     async function bootstrap() {
       try {
         const supabaseClient = createSupabaseClient(createClient);
-        window.__SUPABASE_CLIENT = supabaseClient; // fallback for older modules
+        window.__SUPABASE_CLIENT = supabaseClient;
 
-        statusEl.textContent = 'Inicializando sessão...';
+        statusEl && (statusEl.textContent = 'Inicializando sessão...');
         await initSession(supabaseClient);
         const s = getState();
 
-        // If no user, go to login
+        // decide destino sem fazer redirect para a mesma página
         if (!s.user) {
-          statusEl.textContent = 'Nenhuma sessão ativa. Redirecionando para login...';
-          return window.location.replace('/login.html');
+          statusEl && (statusEl.textContent = 'Nenhuma sessão ativa. Redirecionando para login...');
+          if (location.pathname !== '/login.html') location.replace('/login.html');
+          return;
         }
 
-        // If superadmin go to admin area; else user area
         if (s.isSuper) {
-          statusEl.textContent = 'Administrador detectado. Redirecionando...';
-          return window.location.replace('/admin.html');
+          if (location.pathname !== '/admin.html') {
+            statusEl && (statusEl.textContent = 'Administrador detectado. Redirecionando...');
+            location.replace('/admin.html');
+          } else {
+            statusEl && (statusEl.textContent = 'Você já está em /admin.html');
+          }
+          return;
         } else {
-          statusEl.textContent = 'Usuário detectado. Redirecionando...';
-          return window.location.replace('/user.html');
+          if (location.pathname !== '/user.html') {
+            statusEl && (statusEl.textContent = 'Usuário detectado. Redirecionando...');
+            location.replace('/user.html');
+          } else {
+            statusEl && (statusEl.textContent = 'Você já está em /user.html');
+          }
+          return;
         }
       } catch (err) {
         console.error('bootstrap error', err);
-        try { statusEl.textContent = 'Erro ao validar sessão. Redirecionando para login...'; } catch(_) {}
+        statusEl && (statusEl.textContent = 'Erro ao validar sessão. Redirecionando para login...');
         try { await window.__SUPABASE_CLIENT?.auth?.signOut(); } catch(_) {}
-        return window.location.replace('/login.html');
+        if (location.pathname !== '/login.html') location.replace('/login.html');
       }
     }
 
     bootstrap();
-  </script>
+  } else {
+    console.info('bootstrap skipped: already bootstrapped');
+  }
+</script>
+
+
+
 </body>
 </html>

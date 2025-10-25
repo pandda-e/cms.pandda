@@ -20,30 +20,42 @@
 
   <script src="/_env.js"></script>
   <script type="module">
-    import { createSupabaseClient } from '/src/core/supabase.js';
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-    import { initialize as initSession, getState, clearSession } from '/js/auth/session.js';
+  import { createSupabaseClient } from '/src/core/supabase.js';
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+  import { initialize as initSession, getState, clearSession } from '/js/auth/session.js';
 
-    async function bootstrap() {
+  if (!window.__PANDDA_BOOTSTRAPPED_USER) {
+    window.__PANDDA_BOOTSTRAPPED_USER = true;
+
+    async function bootstrapUser() {
       const supabaseClient = createSupabaseClient(createClient);
       window.__SUPABASE_CLIENT = supabaseClient;
       try {
         await initSession(supabaseClient);
         const s = getState();
-        if (!s.user) return window.location.replace('/login.html');
+        if (!s.user) {
+          console.warn('user bootstrap: sem user — redirect to login');
+          if (location.pathname !== '/login.html') location.replace('/login.html');
+          return;
+        }
 
-        // now import components and router
+        // session ok — carregar UI
         await import('/js/components/sidebar.js');
         await import('/js/components/topbar.js');
         await import('/js/app.js');
       } catch (err) {
         console.error('user bootstrap error', err);
-        try { await clearSession(); } catch(_) {}
-        return window.location.replace('/login.html');
+        try { await clearSession(); } catch (_) {}
+        if (location.pathname !== '/login.html') location.replace('/login.html');
       }
     }
 
-    bootstrap();
-  </script>
+    bootstrapUser();
+  } else {
+    console.info('user bootstrap skipped: already bootstrapped');
+  }
+</script>
+
+
 </body>
 </html>
