@@ -3,67 +3,87 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin — Pandda</title>
+  <title>Pandda — Login</title>
   <link rel="stylesheet" href="/css/globals.css" />
-  <link rel="stylesheet" href="/css/theme.css" />
-  <link rel="stylesheet" href="/css/topbar.css" />
-  <link rel="stylesheet" href="/css/sidebar.css" />
+  <link rel="stylesheet" href="/css/login.css" />
 </head>
-<body class="theme-dark">
-  <div id="app" class="app-root">
-    <aside id="sidebar-container" class="sidebar-container" aria-hidden="true"></aside>
-    <div class="main-area">
-      <header id="topbar-container" class="topbar-container" aria-hidden="true"></header>
-      <main id="view-root" class="view-root" role="main" aria-live="polite"></main>
-    </div>
-  </div>
+<body class="theme-light">
+  <main class="login-root" role="main">
+    <section class="login-panel">
+      <h1>Entrar</h1>
+      <form id="login-form" action="#" autocomplete="on" novalidate>
+        <label for="email">E‑mail</label>
+        <input id="email" name="email" type="email" required />
+        <label for="password">Senha</label>
+        <input id="password" name="password" type="password" required />
+        <button id="btn-login" type="submit">Entrar</button>
+        <p id="login-status" class="small"></p>
+      </form>
+    </section>
+  </main>
 
   <script src="/_env.js"></script>
   <script type="module">
-    import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
+  import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
+    try {
+      const createClient = sdk.createClient;
+      const { createSupabaseClient } = await import('/src/core/supabase.js');
+      const sessionMod = await import('/js/auth/session.js');
+
+      const sup = createSupabaseClient(createClient);
+      window.__SUPABASE_CLIENT = sup;
+
+      const form = document.getElementById('login-form');
+      const statusEl = document.getElementById('login-status');
+      const REDIRECT_LOCK_KEY = 'pandda_redirect_lock';
+
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        statusEl.textContent = 'Entrando…';
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+
+        try {
+          const res = await sup.auth.signInWithPassword({ email, password });
+          if (res.error) throw res.error;
+          await sessionMod.initialize(sup);
+          // set lock briefly to avoid immediate redirect loops between pages
+          try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
+          statusEl.textContent = 'Login bem‑sucedido; redirecionando…';
+          location.replace('/');
+        } catch (err) {
+          console.error('login error', err);
+          statusEl.textContent = err?.message || 'Erro no login';
+        }
+      });
+
+      // Only redirect to / if a valid session exists and we're not in a redirect-lock window
       try {
-        if (window.__PANDDA_BOOTSTRAPPED_ADMIN) return;
-        window.__PANDDA_BOOTSTRAPPED_ADMIN = true;
-
-        const createClient = sdk.createClient;
-        const { createSupabaseClient } = await import('/src/core/supabase.js');
-        const sessionMod = await import('/js/auth/session.js');
-
-        const sup = createSupabaseClient(createClient);
-        window.__SUPABASE_CLIENT = sup;
-
-        const initPromise = sessionMod.initialize(sup);
-        const initRes = await Promise.race([
-          initPromise,
-          new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 7000))
-        ]).catch(e => ({ __initError: true, message: e?.message }));
-
-        const user = initRes?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
-        const isSuper = sessionMod.getState ? sessionMod.getState().isSuper : false;
-
-        if (!user) {
-          if (location.pathname !== '/login.html') location.replace('/login.html');
-          return;
+        const { data } = await sup.auth.getSession();
+        const user = data?.session?.user;
+        if (user) {
+          const lock = sessionStorage.getItem(REDIRECT_LOCK_KEY);
+          if (!lock || Date.now() - Number(lock) > 3000) {
+            // set lock and redirect once
+            try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
+            location.replace('/');
+          } else {
+            // within lock window — do nothing to avoid loop
+            statusEl.textContent = 'Sessão detectada. Aguarde...';
+          }
         }
-
-        if (!isSuper) {
-          await sessionMod.clearSession?.();
-          if (location.pathname !== '/login.html') location.replace('/login.html');
-          return;
-        }
-
-        // sessão ok e com permissão: carregar UI
-        await import('/js/components/sidebar.js');
-        await import('/js/components/topbar.js');
-        await import('/js/app.js');
-      } catch (err) {
-        try { await (await import('/js/auth/session.js')).clearSession?.(); } catch(_) {}
-        if (location.pathname !== '/login.html') location.replace('/login.html');
+      } catch (e) {
+        // ignore and allow user to login manually
       }
-    }).catch(err => {
-      console.error('admin bootstrap failed', err);
-      if (location.pathname !== '/login.html') location.replace('/login.html');
-    });
-  </script>
+    } catch (err) {
+      console.error('login bootstrap failed', err);
+      document.getElementById('login-status').textContent = 'Erro interno, recarregue a página.';
+    }
+  }).catch(err=>{
+    console.error('login bootstrap dynamic import failed', err);
+    document.getElementById('login-status').textContent = 'Erro interno, recarregue a página.';
+  });
+</script>
+
 </body>
 </html>

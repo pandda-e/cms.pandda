@@ -25,60 +25,64 @@
 
   <script src="/_env.js"></script>
   <script type="module">
-    // bootstrap: rápida checagem de sessão e redirecionamento imediato
-    import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
-      try {
-        if (window.__PANDDA_BOOTSTRAPPED_SAFE) return;
-        window.__PANDDA_BOOTSTRAPPED_SAFE = true;
+  import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
+    try {
+      if (window.__PANDDA_BOOTSTRAPPED_SAFE) return;
+      window.__PANDDA_BOOTSTRAPPED_SAFE = true;
 
-        const createClient = sdk.createClient;
-        const { createSupabaseClient } = await import('/src/core/supabase.js');
-        const sessionMod = await import('/js/auth/session.js');
+      const createClient = sdk.createClient;
+      const { createSupabaseClient } = await import('/src/core/supabase.js');
+      const sessionMod = await import('/js/auth/session.js');
 
-        const statusEl = document.getElementById('boot-status');
-        statusEl && (statusEl.textContent = 'Inicializando sessão...');
+      const statusEl = document.getElementById('boot-status');
+      statusEl && (statusEl.textContent = 'Inicializando sessão...');
 
-        const sup = createSupabaseClient(createClient);
-        window.__SUPABASE_CLIENT = sup;
+      const sup = createSupabaseClient(createClient);
+      window.__SUPABASE_CLIENT = sup;
 
-        // very short timeout to keep UI responsive
-        const initPromise = sessionMod.initialize(sup);
-        const initRes = await Promise.race([
-          initPromise,
-          new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 900))
-        ]).catch(e => ({ __initError: true, message: e?.message }));
-
-        const user = initRes?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
-        const isSuper = sessionMod.getState ? sessionMod.getState().isSuper : false;
-
-        if (!user) {
-          statusEl && (statusEl.textContent = 'Nenhuma sessão ativa. Redirecionando para login...');
-          if (location.pathname !== '/login.html') location.replace('/login.html');
-          return;
-        }
-
-        if (isSuper) {
-          if (location.pathname !== '/admin.html') {
-            statusEl && (statusEl.textContent = 'Administrador detectado. Redirecionando...');
-            location.replace('/admin.html');
-            return;
-          }
-        } else {
-          if (location.pathname !== '/user.html') {
-            statusEl && (statusEl.textContent = 'Usuário detectado. Redirecionando...');
-            location.replace('/user.html');
-            return;
-          }
-        }
-      } catch (err) {
-        try { document.getElementById('boot-status').textContent = 'Erro ao validar sessão. Redirecionando para login...'; } catch(_) {}
-        try { window.__SUPABASE_CLIENT?.auth?.signOut?.(); } catch(_) {}
-        if (location.pathname !== '/login.html') location.replace('/login.html');
+      // small guard to avoid immediate repeated redirects across pages
+      const REDIRECT_LOCK_KEY = 'pandda_redirect_lock';
+      const lock = sessionStorage.getItem(REDIRECT_LOCK_KEY);
+      if (lock && Date.now() - Number(lock) < 3000) {
+        statusEl && (statusEl.textContent = 'Tentando reconectar...');
       }
-    }).catch(err => {
-      console.error('bootstrap dynamic import failed', err);
+
+      const initPromise = sessionMod.initialize(sup);
+      const initRes = await Promise.race([
+        initPromise,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 900))
+      ]).catch(e => ({ __initError: true, message: e?.message }));
+
+      const user = initRes?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
+      const isSuper = sessionMod.getState ? sessionMod.getState().isSuper : false;
+
+      if (!user) {
+        statusEl && (statusEl.textContent = 'Nenhuma sessão ativa. Redirecionando para login...');
+        // do not redirect if already on login page
+        if (location.pathname !== '/login.html') {
+          // set lock to prevent immediate loop
+          try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
+          location.replace('/login.html');
+        }
+        return;
+      }
+
+      // user exists: proceed
+      if (isSuper) {
+        if (location.pathname !== '/admin.html') location.replace('/admin.html');
+      } else {
+        if (location.pathname !== '/user.html') location.replace('/user.html');
+      }
+    } catch (err) {
+      try { document.getElementById('boot-status').textContent = 'Erro ao validar sessão. Redirecionando para login...'; } catch(_) {}
+      try { window.__SUPABASE_CLIENT?.auth?.signOut?.(); } catch(_) {}
       if (location.pathname !== '/login.html') location.replace('/login.html');
-    });
-  </script>
+    }
+  }).catch(err => {
+    console.error('bootstrap dynamic import failed', err);
+    if (location.pathname !== '/login.html') location.replace('/login.html');
+  });
+</script>
+
 </body>
 </html>
