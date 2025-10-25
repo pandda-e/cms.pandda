@@ -6,6 +6,7 @@
   <title>Pandda — Login</title>
   <link rel="stylesheet" href="/css/globals.css" />
   <link rel="stylesheet" href="/css/login.css" />
+  <link rel="stylesheet" href="/css/sidebar.css" />
 </head>
 <body class="theme-light">
   <main class="login-root" role="main">
@@ -23,67 +24,61 @@
   </main>
 
   <script src="/_env.js"></script>
+  <script type="module" src="/js/components/sidebar.js"></script>
   <script type="module">
-  import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
-    try {
-      const createClient = sdk.createClient;
-      const { createSupabaseClient } = await import('/src/core/supabase.js');
-      const sessionMod = await import('/js/auth/session.js');
+    import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
+      try {
+        const createClient = sdk.createClient;
+        const { createSupabaseClient } = await import('/src/core/supabase.js');
+        const sessionMod = await import('/js/auth/session.js');
 
-      const sup = createSupabaseClient(createClient);
-      window.__SUPABASE_CLIENT = sup;
+        const sup = createSupabaseClient(createClient);
+        window.__SUPABASE_CLIENT = sup;
 
-      const form = document.getElementById('login-form');
-      const statusEl = document.getElementById('login-status');
-      const REDIRECT_LOCK_KEY = 'pandda_redirect_lock';
+        const form = document.getElementById('login-form');
+        const statusEl = document.getElementById('login-status');
+        const REDIRECT_LOCK_KEY = 'pandda_redirect_lock';
 
-      form.addEventListener('submit', async (ev) => {
-        ev.preventDefault();
-        statusEl.textContent = 'Entrando…';
-        const email = document.getElementById('email').value.trim();
-        const password = document.getElementById('password').value;
+        form.addEventListener('submit', async (ev) => {
+          ev.preventDefault();
+          statusEl.textContent = 'Entrando…';
+          const email = document.getElementById('email').value.trim();
+          const password = document.getElementById('password').value;
+
+          try {
+            const res = await sup.auth.signInWithPassword({ email, password });
+            if (res.error) throw res.error;
+            await sessionMod.initialize(sup);
+            try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
+            statusEl.textContent = 'Login bem‑sucedido; redirecionando…';
+            location.replace('/');
+          } catch (err) {
+            console.error('login error', err);
+            statusEl.textContent = err?.message || 'Erro no login';
+          }
+        });
 
         try {
-          const res = await sup.auth.signInWithPassword({ email, password });
-          if (res.error) throw res.error;
-          await sessionMod.initialize(sup);
-          // set lock briefly to avoid immediate redirect loops between pages
-          try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
-          statusEl.textContent = 'Login bem‑sucedido; redirecionando…';
-          location.replace('/');
-        } catch (err) {
-          console.error('login error', err);
-          statusEl.textContent = err?.message || 'Erro no login';
-        }
-      });
-
-      // Only redirect to / if a valid session exists and we're not in a redirect-lock window
-      try {
-        const { data } = await sup.auth.getSession();
-        const user = data?.session?.user;
-        if (user) {
-          const lock = sessionStorage.getItem(REDIRECT_LOCK_KEY);
-          if (!lock || Date.now() - Number(lock) > 3000) {
-            // set lock and redirect once
-            try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
-            location.replace('/');
-          } else {
-            // within lock window — do nothing to avoid loop
-            statusEl.textContent = 'Sessão detectada. Aguarde...';
+          const { data } = await sup.auth.getSession();
+          const user = data?.session?.user;
+          if (user) {
+            const lock = sessionStorage.getItem(REDIRECT_LOCK_KEY);
+            if (!lock || Date.now() - Number(lock) > 3000) {
+              try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
+              location.replace('/');
+            } else {
+              statusEl.textContent = 'Sessão detectada. Aguarde...';
+            }
           }
-        }
-      } catch (e) {
-        // ignore and allow user to login manually
+        } catch(_) {}
+      } catch (err) {
+        console.error('login bootstrap failed', err);
+        document.getElementById('login-status').textContent = 'Erro interno, recarregue a página.';
       }
-    } catch (err) {
-      console.error('login bootstrap failed', err);
+    }).catch(err=>{
+      console.error('login bootstrap dynamic import failed', err);
       document.getElementById('login-status').textContent = 'Erro interno, recarregue a página.';
-    }
-  }).catch(err=>{
-    console.error('login bootstrap dynamic import failed', err);
-    document.getElementById('login-status').textContent = 'Erro interno, recarregue a página.';
-  });
-</script>
-
+    });
+  </script>
 </body>
 </html>

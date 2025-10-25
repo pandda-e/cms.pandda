@@ -12,8 +12,14 @@
 <body class="theme-dark">
   <div id="app" class="app-root">
     <aside id="sidebar-container" class="sidebar-container" aria-hidden="true"></aside>
+
     <div class="main-area">
-      <header id="topbar-container" class="topbar-container" aria-hidden="true"></header>
+      <header id="topbar-container" class="topbar-container" aria-hidden="true">
+        <!-- topbar toggle snippet -->
+        <button aria-label="Abrir menu" class="topbar-hamburger" data-sidebar-toggle
+          onclick="window.togglePanddaSidebar && window.togglePanddaSidebar()">☰</button>
+      </header>
+
       <main id="view-root" class="view-root" role="main" aria-live="polite">
         <section class="placeholder">
           <h1>Verificando sessão…</h1>
@@ -24,65 +30,69 @@
   </div>
 
   <script src="/_env.js"></script>
+  <script type="module" src="/js/components/sidebar.js"></script>
   <script type="module">
-  import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
-    try {
-      if (window.__PANDDA_BOOTSTRAPPED_SAFE) return;
-      window.__PANDDA_BOOTSTRAPPED_SAFE = true;
+    import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
+      try {
+        if (window.__PANDDA_BOOTSTRAPPED_SAFE) return;
+        window.__PANDDA_BOOTSTRAPPED_SAFE = true;
 
-      const createClient = sdk.createClient;
-      const { createSupabaseClient } = await import('/src/core/supabase.js');
-      const sessionMod = await import('/js/auth/session.js');
+        const createClient = sdk.createClient;
+        const { createSupabaseClient } = await import('/src/core/supabase.js');
+        const sessionMod = await import('/js/auth/session.js');
 
-      const statusEl = document.getElementById('boot-status');
-      statusEl && (statusEl.textContent = 'Inicializando sessão...');
+        const statusEl = document.getElementById('boot-status');
+        statusEl && (statusEl.textContent = 'Inicializando sessão...');
 
-      const sup = createSupabaseClient(createClient);
-      window.__SUPABASE_CLIENT = sup;
+        const sup = createSupabaseClient(createClient);
+        window.__SUPABASE_CLIENT = sup;
 
-      // small guard to avoid immediate repeated redirects across pages
-      const REDIRECT_LOCK_KEY = 'pandda_redirect_lock';
-      const lock = sessionStorage.getItem(REDIRECT_LOCK_KEY);
-      if (lock && Date.now() - Number(lock) < 3000) {
-        statusEl && (statusEl.textContent = 'Tentando reconectar...');
-      }
-
-      const initPromise = sessionMod.initialize(sup);
-      const initRes = await Promise.race([
-        initPromise,
-        new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 900))
-      ]).catch(e => ({ __initError: true, message: e?.message }));
-
-      const user = initRes?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
-      const isSuper = sessionMod.getState ? sessionMod.getState().isSuper : false;
-
-      if (!user) {
-        statusEl && (statusEl.textContent = 'Nenhuma sessão ativa. Redirecionando para login...');
-        // do not redirect if already on login page
-        if (location.pathname !== '/login.html') {
-          // set lock to prevent immediate loop
-          try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
-          location.replace('/login.html');
+        const REDIRECT_LOCK_KEY = 'pandda_redirect_lock';
+        const lock = sessionStorage.getItem(REDIRECT_LOCK_KEY);
+        if (lock && Date.now() - Number(lock) < 3000) {
+          statusEl && (statusEl.textContent = 'Tentando reconectar...');
         }
-        return;
-      }
 
-      // user exists: proceed
-      if (isSuper) {
-        if (location.pathname !== '/admin.html') location.replace('/admin.html');
-      } else {
-        if (location.pathname !== '/user.html') location.replace('/user.html');
+        const initPromise = sessionMod.initialize(sup);
+        const initRes = await Promise.race([
+          initPromise,
+          new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 900))
+        ]).catch(e => ({ __initError: true, message: e?.message }));
+
+        const user = initRes?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
+        const isSuper = sessionMod.getState ? sessionMod.getState().isSuper : false;
+
+        if (!user) {
+          statusEl && (statusEl.textContent = 'Nenhuma sessão ativa. Redirecionando para login...');
+          if (location.pathname !== '/login.html') {
+            try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
+            location.replace('/login.html');
+          }
+          return;
+        }
+
+        // session ok: initialize UI modules
+        try {
+          await import('/js/components/topbar.js');
+          await import('/js/app.js');
+        } catch(e) {
+          console.error('Erro ao carregar UI após sessão', e);
+        }
+
+        if (isSuper) {
+          if (location.pathname !== '/admin.html') location.replace('/admin.html');
+        } else {
+          if (location.pathname !== '/user.html') location.replace('/user.html');
+        }
+      } catch (err) {
+        try { document.getElementById('boot-status').textContent = 'Erro ao validar sessão. Redirecionando para login...'; } catch(_) {}
+        try { window.__SUPABASE_CLIENT?.auth?.signOut?.(); } catch(_) {}
+        if (location.pathname !== '/login.html') location.replace('/login.html');
       }
-    } catch (err) {
-      try { document.getElementById('boot-status').textContent = 'Erro ao validar sessão. Redirecionando para login...'; } catch(_) {}
-      try { window.__SUPABASE_CLIENT?.auth?.signOut?.(); } catch(_) {}
+    }).catch(err => {
+      console.error('bootstrap dynamic import failed', err);
       if (location.pathname !== '/login.html') location.replace('/login.html');
-    }
-  }).catch(err => {
-    console.error('bootstrap dynamic import failed', err);
-    if (location.pathname !== '/login.html') location.replace('/login.html');
-  });
-</script>
-
+    });
+  </script>
 </body>
 </html>

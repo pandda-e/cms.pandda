@@ -12,13 +12,19 @@
 <body class="theme-dark">
   <div id="app" class="app-root">
     <aside id="sidebar-container" class="sidebar-container" aria-hidden="true"></aside>
+
     <div class="main-area">
-      <header id="topbar-container" class="topbar-container" aria-hidden="true"></header>
+      <header id="topbar-container" class="topbar-container" aria-hidden="true">
+        <button aria-label="Abrir menu" class="topbar-hamburger" data-sidebar-toggle
+          onclick="window.togglePanddaSidebar && window.togglePanddaSidebar()">☰</button>
+      </header>
+
       <main id="view-root" class="view-root" role="main" aria-live="polite"></main>
     </div>
   </div>
 
   <script src="/_env.js"></script>
+  <script type="module" src="/js/components/sidebar.js"></script>
   <script type="module">
     import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
       try {
@@ -45,7 +51,6 @@
           return;
         }
 
-        await import('/js/components/sidebar.js');
         await import('/js/components/topbar.js');
         await import('/js/app.js');
       } catch (err) {
