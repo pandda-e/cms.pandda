@@ -14,10 +14,7 @@
     <aside id="sidebar-container" class="sidebar-container" aria-hidden="true"></aside>
 
     <div class="main-area">
-      <header id="topbar-container" class="topbar-container" aria-hidden="true">
-        <button aria-label="Abrir menu" class="topbar-hamburger" data-sidebar-toggle
-          onclick="window.togglePanddaSidebar && window.togglePanddaSidebar()">☰</button>
-      </header>
+      <header id="topbar-container" class="topbar-container" aria-hidden="true"></header>
 
       <main id="view-root" class="view-root" role="main" aria-live="polite">
         <section class="placeholder">
@@ -52,17 +49,14 @@
           statusEl && (statusEl.textContent = 'Tentando reconectar...');
         }
 
-        // initialize but allow a short grace period if local tokens exist
         const haveLocalAuth = !!localStorage.getItem('pandda_session_v1') || !!Object.keys(localStorage).find(k=>k.includes('auth-token')||k.startsWith('sb-'));
         let initRes = null;
         try {
           if (haveLocalAuth) {
-            // race initialize with short timeout so we don't redirect prematurely
             initRes = await Promise.race([
               sessionMod.initialize(sup),
               new Promise(res => setTimeout(() => res(null), 700))
             ]);
-            // if initialize returned null but local tokens exist, attempt a final short init
             if (!initRes) {
               try { initRes = await sessionMod.initialize(sup); } catch(_) { initRes = null; }
             }
@@ -88,15 +82,46 @@
           return;
         }
 
-        // session ok: initialize UI modules (non-blocking)
-        try {
-          await import('/js/components/topbar.js');
-          await import('/js/app.js');
-        } catch(e) {
-          console.error('Erro ao carregar UI após sessão', e);
+        async function safeMountTopbar(selector = '#topbar-container') {
+          const waitForContainer = async (ms = 700) => {
+            const start = Date.now();
+            while (!document.querySelector(selector) && Date.now() - start < ms) {
+              await new Promise(r => setTimeout(r, 50));
+            }
+            return !!document.querySelector(selector);
+          };
+          const present = await waitForContainer(700);
+          if (!present) { console.warn('safeMountTopbar: container not found', selector); return; }
+          try {
+            const m = await import('/js/components/topbar.js');
+            if (m && typeof m.mountTopbar === 'function') await m.mountTopbar(selector);
+          } catch (e) { console.warn('safeMountTopbar failed', e); }
         }
 
-        // route user appropriately
+        try {
+          const [topbarMod, sidebarMod] = await Promise.allSettled([
+            import('/js/components/topbar.js'),
+            import('/js/components/sidebar.js')
+          ]);
+
+          if (topbarMod.status === 'fulfilled' && typeof topbarMod.value.mountTopbar === 'function') {
+            try { await safeMountTopbar('#topbar-container'); } catch(e){ console.warn('topbar mount failed', e); }
+          } else {
+            console.warn('topbar module not available', topbarMod.reason);
+          }
+
+          if (sidebarMod.status === 'fulfilled' && typeof sidebarMod.value.setupSidebar === 'function') {
+            try { sidebarMod.value.setupSidebar(); } catch(e){ console.warn('sidebar setup failed', e); }
+          } else {
+            try { window.togglePanddaSidebar && window.togglePanddaSidebar(); } catch(_) {}
+            console.warn('sidebar module not available', sidebarMod.reason);
+          }
+
+          import('/js/app.js').catch(e => console.warn('app.js load failed', e));
+        } catch (e) {
+          console.warn('UI init failed', e);
+        }
+
         if (isSuper) {
           if (location.pathname !== '/admin' && location.pathname !== '/admin.html') location.replace('/admin');
         } else {
