@@ -26,59 +26,79 @@
   <script src="/_env.js"></script>
   <script type="module" src="/js/components/sidebar.js"></script>
   <script type="module">
-    import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
-      try {
-        const createClient = sdk.createClient;
-        const { createSupabaseClient } = await import('/src/core/supabase.js');
-        const sessionMod = await import('/js/auth/session.js');
+  import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
+    try {
+      const createClient = sdk.createClient;
+      const { createSupabaseClient } = await import('/src/core/supabase.js');
+      const sessionMod = await import('/js/auth/session.js');
 
-        const sup = createSupabaseClient(createClient);
-        window.__SUPABASE_CLIENT = sup;
+      const sup = createSupabaseClient(createClient);
+      window.__SUPABASE_CLIENT = sup;
 
-        const form = document.getElementById('login-form');
-        const statusEl = document.getElementById('login-status');
-        const REDIRECT_LOCK_KEY = 'pandda_redirect_lock';
+      const form = document.getElementById('login-form');
+      const statusEl = document.getElementById('login-status');
+      const REDIRECT_LOCK_KEY = 'pandda_redirect_lock';
 
-        form.addEventListener('submit', async (ev) => {
-          ev.preventDefault();
-          statusEl.textContent = 'Entrando…';
-          const email = document.getElementById('email').value.trim();
-          const password = document.getElementById('password').value;
-
+      async function waitForSdkSession(timeoutMs = 2500, intervalMs = 150) {
+        const start = Date.now();
+        while (Date.now() - start < timeoutMs) {
           try {
-            const res = await sup.auth.signInWithPassword({ email, password });
-            if (res.error) throw res.error;
-            await sessionMod.initialize(sup);
-            try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
-            statusEl.textContent = 'Login bem‑sucedido; redirecionando…';
-            location.replace('/');
-          } catch (err) {
-            console.error('login error', err);
-            statusEl.textContent = err?.message || 'Erro no login';
-          }
-        });
+            const { data } = await sup.auth.getSession();
+            if (data?.session?.user) return data.session;
+          } catch(_) {}
+          await new Promise(r => setTimeout(r, intervalMs));
+        }
+        return null;
+      }
+
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        statusEl.textContent = 'Entrando…';
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
 
         try {
-          const { data } = await sup.auth.getSession();
-          const user = data?.session?.user;
-          if (user) {
-            const lock = sessionStorage.getItem(REDIRECT_LOCK_KEY);
-            if (!lock || Date.now() - Number(lock) > 3000) {
-              try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
-              location.replace('/');
-            } else {
-              statusEl.textContent = 'Sessão detectada. Aguarde...';
-            }
-          }
-        } catch(_) {}
-      } catch (err) {
-        console.error('login bootstrap failed', err);
-        document.getElementById('login-status').textContent = 'Erro interno, recarregue a página.';
+          const res = await sup.auth.signInWithPassword({ email, password });
+          if (res.error) throw res.error;
+
+          // wait a short moment for SDK to persist session
+          const sdkSession = await waitForSdkSession(3000, 150);
+
+          // ensure app session initialized from SDK
+          try { await sessionMod.initialize(sup); } catch(e){ console.warn('session init after login failed', e); }
+
+          // set lock briefly to avoid race loops, then redirect to root immediately
+          try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
+          statusEl.textContent = 'Login bem‑sucedido; redirecionando…';
+          location.replace('/');
+        } catch (err) {
+          console.error('login error', err);
+          statusEl.textContent = err?.message || 'Erro no login';
+        }
+      });
+
+      // On load: if SDK already has a session, redirect immediately to root
+      try {
+        const { data } = await sup.auth.getSession();
+        const user = data?.session?.user;
+        if (user) {
+          // If session exists, force redirect to app root.
+          // Do not let a stale lock block this redirect (login page intent is to leave).
+          try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
+          location.replace('/');
+        }
+      } catch(_) {
+        // ignore; user will login manually
       }
-    }).catch(err=>{
-      console.error('login bootstrap dynamic import failed', err);
+    } catch (err) {
+      console.error('login bootstrap failed', err);
       document.getElementById('login-status').textContent = 'Erro interno, recarregue a página.';
-    });
-  </script>
+    }
+  }).catch(err=>{
+    console.error('login bootstrap dynamic import failed', err);
+    document.getElementById('login-status').textContent = 'Erro interno, recarregue a página.';
+  });
+</script>
+
 </body>
 </html>
