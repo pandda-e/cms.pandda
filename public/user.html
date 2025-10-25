@@ -35,6 +35,17 @@
         const sup = createSupabaseClient(createClient);
         window.__SUPABASE_CLIENT = sup;
 
+        // redirect listener for runtime session changes
+        try {
+          sessionMod.onChange && sessionMod.onChange((st) => {
+            const userNow = st?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
+            if (!userNow) {
+              try { sessionStorage.setItem('pandda_redirect_lock', String(Date.now())); } catch(_) {}
+              if (location.pathname !== '/login.html') location.replace('/login.html');
+            }
+          });
+        } catch(e){ console.warn('session onChange listener failed', e); }
+
         const haveLocalAuth = !!localStorage.getItem('pandda_session_v1') || !!Object.keys(localStorage).find(k=>k.includes('auth-token')||k.startsWith('sb-'));
 
         let initRes = null;

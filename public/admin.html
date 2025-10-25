@@ -35,6 +35,17 @@
         const sup = createSupabaseClient(createClient);
         window.__SUPABASE_CLIENT = sup;
 
+        // redirect listener for runtime session changes
+        try {
+          sessionMod.onChange && sessionMod.onChange((st) => {
+            const userNow = st?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
+            if (!userNow) {
+              try { sessionStorage.setItem('pandda_redirect_lock', String(Date.now())); } catch(_) {}
+              if (location.pathname !== '/login.html') location.replace('/login.html');
+            }
+          });
+        } catch(e){ console.warn('session onChange listener failed', e); }
+
         const REDIRECT_LOCK_KEY = 'pandda_redirect_lock';
         const haveLocalAuth = !!localStorage.getItem('pandda_session_v1') || !!Object.keys(localStorage).find(k=>k.includes('auth-token')||k.startsWith('sb-'));
 
@@ -59,12 +70,13 @@
         }
 
         let user = initRes?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
-        const isSuper = sessionMod.getState ? sessionMod.getState().isSuper : false;
+        let isSuper = sessionMod.getState ? sessionMod.getState().isSuper : false;
 
         if (!user && haveLocalAuth) {
           try {
             const final = await Promise.race([sessionMod.initialize(sup), new Promise(res=>setTimeout(()=>res(null), 600))]);
             user = final?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
+            isSuper = final?.isSuper ?? isSuper;
           } catch(_) { user = null; }
         }
 
@@ -74,6 +86,18 @@
             location.replace('/login.html');
           }
           return;
+        }
+
+        // If not super, attempt a final initialize before clearing session; avoid false negatives
+        if (!isSuper) {
+          const final = await Promise.race([sessionMod.initialize(sup), new Promise(res=>setTimeout(()=>res(null), 600))]).catch(()=>null);
+          const finalIsSuper = final?.isSuper ?? (sessionMod.getState ? sessionMod.getState().isSuper : false);
+          if (!finalIsSuper) {
+            await sessionMod.clearSession?.();
+            try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
+            if (location.pathname !== '/login.html') location.replace('/login.html');
+            return;
+          }
         }
 
         async function safeMountTopbar(selector = '#topbar-container') {
@@ -114,15 +138,6 @@
           import('/js/app.js').catch(e => console.warn('app.js load failed', e));
         } catch (e) {
           console.warn('UI init failed', e);
-        }
-
-        if (!isSuper) {
-          await sessionMod.clearSession?.();
-          if (location.pathname !== '/login.html') {
-            try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
-            location.replace('/login.html');
-          }
-          return;
         }
 
       } catch (err) {

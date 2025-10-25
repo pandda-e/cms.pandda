@@ -1,5 +1,6 @@
 // public/js/auth/session.js
 // Robust session manager with safer populateFromUser fallback (no aggressive clear on profile fetch errors).
+// Added: clearSession triggers redirect + redirect lock; module exposes onChange listener use.
 
 import {
   getProfile as coreGetProfile,
@@ -147,7 +148,18 @@ export async function clearSession() {
 
   _state = { token:null, user:null, adminId:null, isSuper:false, permissions:[] };
   try { localStorage.removeItem(STORAGE_KEY); } catch(e){ warn('localStorage remove failed', e); }
+
+  // mark a redirect lock so bootstraps don't immediately loop
+  try { sessionStorage.setItem('pandda_redirect_lock', String(Date.now())); } catch(_) {}
+
   notify();
+
+  // perform in-page redirect to login if we are on protected pages
+  try {
+    if (location.pathname !== '/login.html') {
+      location.replace('/login.html');
+    }
+  } catch (_) {}
 }
 
 export async function populateFromUser(user, sessionObj = null) {
