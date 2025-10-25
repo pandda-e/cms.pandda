@@ -1,5 +1,5 @@
 // public/js/auth/session.js
-// Robust session manager that requires explicit initialize(supabaseClient).
+// Robust session manager with safer populateFromUser fallback (no aggressive clear on profile fetch errors).
 
 import {
   getProfile as coreGetProfile,
@@ -98,6 +98,7 @@ export async function initialize(supabaseClient, opts = { retries: 1, retryDelay
     log('populateFromUser succeeded');
   } catch (err) {
     warn('populateFromUser failed', err);
+    // Do not aggressively clear session here; leave SDK session intact and notify listeners
     notify();
   }
 
@@ -149,7 +150,7 @@ export async function clearSession() {
   notify();
 }
 
-async function populateFromUser(user, sessionObj = null) {
+export async function populateFromUser(user, sessionObj = null) {
   if (!user) throw new Error('populateFromUser requires a user object');
 
   _state.user = user;
@@ -157,18 +158,25 @@ async function populateFromUser(user, sessionObj = null) {
 
   try {
     if (!_supabase) throw new Error('populateFromUser needs _supabase client');
-    const profile = await coreGetProfile(_supabase, user.id);
-    _state.isSuper = profile?.role === 'superadmin';
-    _state.adminId = profile?.administrador_id || profile?.admin_id || profile?.administrador || null;
-    _state.permissions = Array.isArray(profile?.permissions) ? profile.permissions : (profile?.permissions || []);
+    // Attempt to load profile but tolerate failures without clearing SDK session
+    let profile = null;
+    try {
+      profile = await coreGetProfile(_supabase, user.id);
+    } catch (err) {
+      // Do not clear session if profile fetch fails; log and proceed with minimal state
+      warn('populateFromUser: profile fetch failed, preserving SDK user state', err);
+    }
+
+    _state.isSuper = profile?.role === 'superadmin' || _state.isSuper === true;
+    _state.adminId = profile?.administrador_id || profile?.admin_id || profile?.administrador || _state.adminId || null;
+    _state.permissions = Array.isArray(profile?.permissions) ? profile.permissions : (_state.permissions || (profile?.permissions ? profile.permissions : []));
     if (!_state.permissions) _state.permissions = [];
     if (_state.isSuper && !_state.permissions.includes('admin.manage')) _state.permissions.push('admin.manage');
-    log('profile loaded', { isSuper: _state.isSuper, adminId: _state.adminId, permissionsCount: _state.permissions.length });
+
+    log('profile loaded (or fallback applied)', { isSuper: _state.isSuper, adminId: _state.adminId, permissionsCount: _state.permissions.length });
   } catch (err) {
-    warn('populateFromUser: could not load profile, using fallback state', err);
-    _state.isSuper = false;
-    if (!_state.adminId) _state.adminId = null;
-    _state.permissions = _state.permissions || [];
+    warn('populateFromUser: unexpected error', err);
+    // keep existing state
   }
 
   save();

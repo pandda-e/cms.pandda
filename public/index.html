@@ -15,7 +15,6 @@
 
     <div class="main-area">
       <header id="topbar-container" class="topbar-container" aria-hidden="true">
-        <!-- topbar toggle snippet -->
         <button aria-label="Abrir menu" class="topbar-hamburger" data-sidebar-toggle
           onclick="window.togglePanddaSidebar && window.togglePanddaSidebar()">☰</button>
       </header>
@@ -53,11 +52,29 @@
           statusEl && (statusEl.textContent = 'Tentando reconectar...');
         }
 
-        const initPromise = sessionMod.initialize(sup);
-        const initRes = await Promise.race([
-          initPromise,
-          new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 900))
-        ]).catch(e => ({ __initError: true, message: e?.message }));
+        // initialize but allow a short grace period if local tokens exist
+        const haveLocalAuth = !!localStorage.getItem('pandda_session_v1') || !!Object.keys(localStorage).find(k=>k.includes('auth-token')||k.startsWith('sb-'));
+        let initRes = null;
+        try {
+          if (haveLocalAuth) {
+            // race initialize with short timeout so we don't redirect prematurely
+            initRes = await Promise.race([
+              sessionMod.initialize(sup),
+              new Promise(res => setTimeout(() => res(null), 700))
+            ]);
+            // if initialize returned null but local tokens exist, attempt a final short init
+            if (!initRes) {
+              try { initRes = await sessionMod.initialize(sup); } catch(_) { initRes = null; }
+            }
+          } else {
+            initRes = await Promise.race([
+              sessionMod.initialize(sup),
+              new Promise(res => setTimeout(() => res(null), 900))
+            ]);
+          }
+        } catch (e) {
+          initRes = { __initError: true, message: e?.message };
+        }
 
         const user = initRes?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
         const isSuper = sessionMod.getState ? sessionMod.getState().isSuper : false;
@@ -71,7 +88,7 @@
           return;
         }
 
-        // session ok: initialize UI modules
+        // session ok: initialize UI modules (non-blocking)
         try {
           await import('/js/components/topbar.js');
           await import('/js/app.js');
@@ -79,10 +96,11 @@
           console.error('Erro ao carregar UI após sessão', e);
         }
 
+        // route user appropriately
         if (isSuper) {
-          if (location.pathname !== '/admin.html') location.replace('/admin.html');
+          if (location.pathname !== '/admin' && location.pathname !== '/admin.html') location.replace('/admin');
         } else {
-          if (location.pathname !== '/user.html') location.replace('/user.html');
+          if (location.pathname !== '/user' && location.pathname !== '/user.html') location.replace('/user');
         }
       } catch (err) {
         try { document.getElementById('boot-status').textContent = 'Erro ao validar sessão. Redirecionando para login...'; } catch(_) {}
