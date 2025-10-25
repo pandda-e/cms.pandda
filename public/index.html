@@ -25,7 +25,7 @@
 
   <script src="/_env.js"></script>
   <script type="module">
-    // Bootstrap seguro: cria o client, inicializa sessão e redireciona rapidamente se não houver user
+    // bootstrap: rápida checagem de sessão e redirecionamento imediato
     import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm').then(async (sdk) => {
       try {
         if (window.__PANDDA_BOOTSTRAPPED_SAFE) return;
@@ -41,13 +41,15 @@
         const sup = createSupabaseClient(createClient);
         window.__SUPABASE_CLIENT = sup;
 
+        // very short timeout to keep UI responsive
         const initPromise = sessionMod.initialize(sup);
         const initRes = await Promise.race([
           initPromise,
-          new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 7000))
+          new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 900))
         ]).catch(e => ({ __initError: true, message: e?.message }));
 
         const user = initRes?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
+        const isSuper = sessionMod.getState ? sessionMod.getState().isSuper : false;
 
         if (!user) {
           statusEl && (statusEl.textContent = 'Nenhuma sessão ativa. Redirecionando para login...');
@@ -55,7 +57,7 @@
           return;
         }
 
-        if (user && (sessionMod.getState?.().isSuper)) {
+        if (isSuper) {
           if (location.pathname !== '/admin.html') {
             statusEl && (statusEl.textContent = 'Administrador detectado. Redirecionando...');
             location.replace('/admin.html');

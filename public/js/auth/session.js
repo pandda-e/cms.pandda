@@ -35,7 +35,7 @@ export function hasPermission(p){ return _state.permissions?.includes(p); }
 export function getToken(){ return _state.token; }
 export function onChange(fn){ listeners.add(fn); return ()=>listeners.delete(fn); }
 
-export async function initialize(supabaseClient, opts = { retries: 2, retryDelayMs: 350 }) {
+export async function initialize(supabaseClient, opts = { retries: 1, retryDelayMs: 200 }) {
   if (_initialized) {
     log('initialize: already initialized');
     return getState();
@@ -43,8 +43,8 @@ export async function initialize(supabaseClient, opts = { retries: 2, retryDelay
   if (_initializing) {
     log('initialize: already initializing, waiting...');
     const start = Date.now();
-    while (_initializing && Date.now() - start < 10000) {
-      await new Promise(r => setTimeout(r, 100));
+    while (_initializing && Date.now() - start < 5000) {
+      await new Promise(r => setTimeout(r, 50));
     }
     return getState();
   }

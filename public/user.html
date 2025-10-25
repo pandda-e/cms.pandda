@@ -35,7 +35,7 @@
         const initPromise = sessionMod.initialize(sup);
         const initRes = await Promise.race([
           initPromise,
-          new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 7000))
+          new Promise((_, rej) => setTimeout(() => rej(new Error('initialize timeout')), 900))
         ]).catch(e => ({ __initError: true, message: e?.message }));
 
         const user = initRes?.user ?? (sessionMod.getState ? sessionMod.getState().user : null);
@@ -45,7 +45,6 @@
           return;
         }
 
-        // sessão ok: carregar UI
         await import('/js/components/sidebar.js');
         await import('/js/components/topbar.js');
         await import('/js/app.js');
