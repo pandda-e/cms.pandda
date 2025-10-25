@@ -1,71 +1,112 @@
 // public/js/components/topbar.js
-import { getState, onChange, clearSession } from '/js/auth/session.js';
+// Builds the topbar using DOM methods only (no innerHTML fetch or template injection).
+// Exports: mountTopbar(container = '#topbar-container')
+// Safe to import multiple times; idempotent mount.
 
-const container = document.getElementById('topbar-container');
-let mounted = false;
-
-async function mountTopbar(){
-  if (!container) { console.warn('topbar: container not found'); return; }
-  const tpl = await fetch('/views/layout/topbar.html').then(r=>r.text());
-  container.innerHTML = tpl;
-  container.querySelectorAll && wire();
-  renderUser();
-
-  // subscribe once
-  onChange(renderUser);
-  mounted = true;
+function createEl(tag, attrs = {}, children = []) {
+  const el = document.createElement(tag);
+  for (const k in attrs) {
+    if (k === 'class') el.className = attrs[k];
+    else if (k === 'text') el.textContent = attrs[k];
+    else if (k === 'html') el.innerHTML = attrs[k]; // reserved but not used by our code
+    else if (k.startsWith('data-')) el.setAttribute(k, attrs[k]);
+    else el.setAttribute(k, attrs[k]);
+  }
+  children.forEach(c => {
+    if (typeof c === 'string') el.appendChild(document.createTextNode(c));
+    else if (c instanceof Node) el.appendChild(c);
+  });
+  return el;
 }
 
-function wire(){
-  const btnTheme = container.querySelector && container.querySelector('#btn-theme-toggle');
-  const btnSidebar = container.querySelector && container.querySelector('#btn-sidebar-toggle');
-  const btnLogout = container.querySelector && container.querySelector('#btn-logout');
+function createTopbarStructure() {
+  // left area: hamburger + brand
+  const hamburger = createEl('button', {
+    class: 'topbar-hamburger',
+    'aria-label': 'Abrir menu',
+    'data-sidebar-toggle': '1',
+    type: 'button'
+  }, ['☰']);
+  const brand = createEl('span', { class: 'brand', text: 'Pandda' });
 
-  if (btnTheme) {
-    btnTheme.addEventListener('click', ()=>{
-      const cur = document.documentElement.getAttribute('data-theme') || (document.body.classList.contains('theme-dark') ? 'dark' : 'light');
-      const next = cur === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      if(next === 'light'){ document.body.classList.remove('theme-dark'); document.body.classList.add('theme-light'); }
-      else { document.body.classList.remove('theme-light'); document.body.classList.add('theme-dark'); }
-      localStorage.setItem('cms_pandda_theme', next);
+  const left = createEl('div', { class: 'topbar-left' }, [hamburger, brand]);
+
+  // right area: search (optional) + profile button
+  const profileBtn = createEl('button', { id: 'topbar-profile-btn', class: 'topbar-btn', type: 'button' }, ['Conta']);
+  const right = createEl('div', { class: 'topbar-right' }, [profileBtn]);
+
+  const topbar = createEl('div', { class: 'topbar' }, [left, right]);
+  return { topbar, hamburger, profileBtn };
+}
+
+export async function mountTopbar(containerSelector = '#topbar-container', opts = {}) {
+  const container = typeof containerSelector === 'string'
+    ? document.querySelector(containerSelector)
+    : containerSelector;
+
+  if (!container) {
+    console.warn('mountTopbar: container not found:', containerSelector);
+    return null;
+  }
+
+  // idempotent: if already mounted, return existing api
+  if (container.__topbar_mounted) return container.__topbar_api || null;
+  container.__topbar_mounted = true;
+
+  // Clear any existing children to ensure single topbar
+  while (container.firstChild) container.removeChild(container.firstChild);
+
+  const { topbar, hamburger, profileBtn } = createTopbarStructure();
+  container.appendChild(topbar);
+
+  // Bind handlers
+  function bindHandlers() {
+    // Hamburger: toggle sidebar (exposed global or lazy-load)
+    hamburger.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (typeof window.togglePanddaSidebar === 'function') {
+        window.togglePanddaSidebar();
+        return;
+      }
+      import('/js/components/sidebar.js').then(m => {
+        if (m && typeof m.setupSidebar === 'function') {
+          m.setupSidebar(); // ensures sidebar exists and sets window.togglePanddaSidebar
+        }
+        if (typeof window.togglePanddaSidebar === 'function') window.togglePanddaSidebar();
+      }).catch(err => console.warn('topbar: failed to lazy-load sidebar module', err));
+    });
+
+    // Profile button: open account page or menu (non-destructive)
+    profileBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      // try to toggle an existing account menu inside container
+      const existingMenu = container.querySelector('.topbar-account-menu');
+      if (existingMenu) {
+        existingMenu.classList.toggle('open');
+        return;
+      }
+      // fallback: navigate to account page without reload loop
+      try { window.location.href = '/account.html'; } catch(_) {}
     });
   }
 
-  if (btnSidebar) {
-    btnSidebar.addEventListener('click', () => {
-      const evt = new CustomEvent('pandda:toggleSidebar');
-      window.dispatchEvent(evt);
-    });
-  }
+  try { bindHandlers(); } catch (err) { console.warn('mountTopbar: bindHandlers failed', err); }
 
-  async function handleLogout(ev) {
-    try { ev?.preventDefault(); } catch(_) {}
-    try {
-      await clearSession();
-      console.info('topbar: clearSession completed');
-    } catch (err) {
-      console.warn('topbar logout error', err);
-      try { if(window.__SUPABASE_CLIENT) await window.__SUPABASE_CLIENT.auth.signOut(); } catch(_){}
-    } finally {
-      window.location.href = '/login.html';
+  const api = {
+    container,
+    refresh: async () => {
+      container.__topbar_mounted = false;
+      return mountTopbar(containerSelector, opts);
     }
-  }
+  };
 
-  if (btnLogout) btnLogout.addEventListener('click', handleLogout);
+  container.__topbar_api = api;
+  return api;
+}
 
-  // global delegated fallback
-  document.addEventListener('click', (ev) => {
-    const t = ev.target.closest && ev.target.closest('#btn-logout');
-    if (t) handleLogout(ev);
+// Auto-mount on load if container exists
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => {
+    try { mountTopbar('#topbar-container').catch(()=>{}); } catch(_) {}
   });
 }
-
-function renderUser(){
-  const emailEl = container.querySelector && container.querySelector('#user-email');
-  const s = getState();
-  if (!container) return;
-  if (emailEl) emailEl.textContent = s.user?.email || '—';
-}
-
-mountTopbar().catch(err => console.error('mountTopbar error', err));
