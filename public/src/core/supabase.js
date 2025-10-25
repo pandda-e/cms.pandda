@@ -1,9 +1,11 @@
-// src/core/supabase.js
-// Safe lazy check for window.__ENV so modules can be imported before _env.js is executed.
-
+// public/src/core/supabase.js
+// Memoized createSupabaseClient to avoid multiple GoTrueClient instances
 export function createSupabaseClient(createClientFn) {
-  if (!createClientFn) {
-    throw new Error('Supabase createClient function not provided.');
+  if (!createClientFn) throw new Error('Supabase createClient function not provided.');
+
+  // reuse global client if already created
+  if (typeof window !== 'undefined' && window.__SUPABASE_CLIENT) {
+    return window.__SUPABASE_CLIENT;
   }
 
   const SUPABASE_URL = window.__ENV && window.__ENV.SUPABASE_URL;
@@ -13,11 +15,13 @@ export function createSupabaseClient(createClientFn) {
     throw new Error('Missing Supabase config. Ensure public/_env.js is present and defines window.__ENV.SUPABASE_URL and SUPABASE_ANON_KEY.');
   }
 
-  return createClientFn(SUPABASE_URL, SUPABASE_ANON_KEY);
-}
+  const client = createClientFn(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Backwards-compatible helpers that expect a supabase client to be passed.
-// Keep these lightweight and non-throwing when no client is provided.
+  // store on window for reuse across modules/pages
+  try { window.__SUPABASE_CLIENT = client; } catch (_){}
+
+  return client;
+}
 
 export const supabase = null;
 
