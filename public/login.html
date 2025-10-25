@@ -1,53 +1,64 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login — Pandda</title>
+  <link rel="stylesheet" href="/css/globals.css" />
   <link rel="stylesheet" href="/src/entities/login/login.css" />
 </head>
-<body>
-  <main>
-    <img src="/assets/logo.png" alt="Logo" />
-    <form id="login-form">
-      <input type="email" name="email" id="email" placeholder="Email" required />
-      <input type="password" name="password" id="password" placeholder="Senha" required />
-      <button type="submit" id="submit-btn">Entrar</button>
-      <div id="login-error" class="error" role="status" aria-live="polite"></div>
-    </form>
+<body class="theme-dark">
+  <main class="login-root">
+    <div class="login-card card" style="width:100%;max-width:420px">
+      <div class="login-header">
+        <div class="brand">
+          <div class="brand-logo" aria-hidden="true"></div>
+          <h1>Entrar</h1>
+        </div>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Alternar tema"><span class="icon">🌓</span></button>
+      </div>
+
+      <form id="login-form" class="login-form" novalidate>
+        <label class="label">Email</label>
+        <input type="email" name="email" id="email" placeholder="seu@exemplo.com" required />
+        <label class="label">Senha</label>
+        <input type="password" name="password" id="password" placeholder="Senha" required />
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+          <button type="submit" id="submit-btn" class="btn primary">Entrar</button>
+          <div id="login-error" class="error" role="status" aria-live="polite"></div>
+        </div>
+      </form>
+    </div>
   </main>
 
   <script src="/_env.js"></script>
   <script type="module">
-    import { createSupabaseClient, getProfile, signIn } from '/src/core/supabase.js';
+    import { createSupabaseClient } from '/src/core/supabase.js';
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    import { initialize as initSession, signIn as sessionSignIn } from '/js/auth/session.js';
 
     const supabaseClient = createSupabaseClient(createClient);
+    await initSession(supabaseClient);
 
     const form = document.getElementById('login-form');
     const errEl = document.getElementById('login-error');
     const submitBtn = document.getElementById('submit-btn');
+    const themeToggle = document.getElementById('theme-toggle');
 
     function setLoading(on){
-      if (submitBtn) {
-        submitBtn.disabled = on;
-        submitBtn.textContent = on ? 'Entrando...' : 'Entrar';
-      }
+      submitBtn.disabled = on;
+      submitBtn.textContent = on ? 'Entrando...' : 'Entrar';
     }
-    function showError(message){
-      if (errEl) errEl.textContent = message || '';
-    }
+    function showError(msg){ errEl.textContent = msg || ''; }
 
-    async function handlePostLogin(user){
-      const profile = await getProfile(supabaseClient, user.id);
-      if(!profile){
-        showError('Perfil não encontrado. Contate o administrador.');
-        await supabaseClient.auth.signOut();
-        return;
-      }
-      if(profile.role === 'superadmin') window.location.href = '/admin.html';
-      else window.location.href = '/user.html';
-    }
+    themeToggle?.addEventListener('click', ()=>{
+      const cur = document.documentElement.getAttribute('data-theme') || (document.body.classList.contains('theme-dark') ? 'dark' : 'light');
+      const next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      if(next === 'light'){ document.body.classList.remove('theme-dark'); document.body.classList.add('theme-light'); }
+      else { document.body.classList.remove('theme-light'); document.body.classList.add('theme-dark'); }
+      localStorage.setItem('cms_pandda_theme', next);
+    });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -55,29 +66,26 @@
       setLoading(true);
       const email = form.email.value.trim();
       const password = form.password.value;
-      if(!email || !password){
-        showError('Preencha email e senha.');
-        setLoading(false);
-        return;
-      }
+      if(!email || !password){ showError('Preencha email e senha.'); setLoading(false); return; }
       try{
-        const res = await signIn(supabaseClient, email, password);
-        const user = res?.user ?? null;
-        if(!user) throw new Error('Resposta de autenticação inválida');
-        await handlePostLogin(user);
+        // session.signIn will call core signIn and populate profile state
+        await sessionSignIn(email, password);
+        const state = (await import('/js/auth/session.js')).getState();
+        if(state.isSuper) window.location.href = '/admin.html';
+        else window.location.href = '/user.html';
       }catch(err){
         showError(err?.message || 'Falha no login');
-      }finally{
-        setLoading(false);
-      }
+      }finally{ setLoading(false); }
     });
 
-    (async function checkSession(){
-      try{
-        const { data } = await supabaseClient.auth.getUser();
-        const user = data?.user || null;
-        if(user) await handlePostLogin(user);
-      }catch(_){}
+    // if already signed in, redirect to appropriate area
+    (async function check(){
+      const { getState } = await import('/js/auth/session.js');
+      const s = getState();
+      if(s.user){
+        if(s.isSuper) window.location.href = '/admin.html';
+        else window.location.href = '/user.html';
+      }
     })();
   </script>
 </body>

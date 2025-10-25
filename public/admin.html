@@ -3,58 +3,40 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Painel Administrador — CMS.PANDDA</title>
-  <link rel="stylesheet" href="/src/entities/login/login.css" />
+  <title>Admin — Pandda</title>
+  <link rel="stylesheet" href="/css/globals.css" />
+  <link rel="stylesheet" href="/css/theme.css" />
+  <link rel="stylesheet" href="/css/topbar.css" />
+  <link rel="stylesheet" href="/css/sidebar.css" />
 </head>
 <body class="theme-dark">
-  <main class="admin-root" style="padding:24px">
-    <header class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <div class="brand" style="display:flex;align-items:center;gap:12px">
-        <img src="/assets/logo.png" alt="logo" class="brand-logo" />
-        <h1 style="margin:0;font-size:18px">CMS.PANDDA — Painel Administrador</h1>
-      </div>
-      <div class="actions">
-        <button id="btn-logout" class="btn">Sair</button>
-      </div>
-    </header>
-
-    <section id="admin-content" aria-live="polite">
-      <h2>Carregando painel administrativo…</h2>
-    </section>
-  </main>
+  <div id="app" class="app-root">
+    <aside id="sidebar-container" class="sidebar-container"></aside>
+    <div class="main-area">
+      <header id="topbar-container" class="topbar-container"></header>
+      <main id="view-root" class="view-root" role="main" aria-live="polite"></main>
+    </div>
+  </div>
 
   <script src="/_env.js"></script>
   <script type="module">
-    import { createSupabaseClient, getProfile } from '/src/core/supabase.js';
+    import { createSupabaseClient } from '/src/core/supabase.js';
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    import { initialize as initSession, getState } from '/js/auth/session.js';
+    import '/js/components/sidebar.js';
+    import '/js/components/topbar.js';
+    import '/js/app.js';
 
     const supabaseClient = createSupabaseClient(createClient);
+    await initSession(supabaseClient);
 
-    async function protectAdmin() {
-      try {
-        const { data } = await supabaseClient.auth.getUser();
-        const user = data?.user || null;
-        if (!user) return window.location.replace('/login.html');
-        const profile = await getProfile(supabaseClient, user.id);
-        if (!profile || profile.role !== 'superadmin') {
-          await supabaseClient.auth.signOut();
-          return window.location.replace('/login.html');
-        }
-        document.getElementById('admin-content').innerHTML = `
-          <p>Bem-vindo, <strong>${profile.email || profile.id}</strong></p>
-          <p>Aqui você tem acesso às ferramentas administrativas.</p>
-        `;
-      } catch (err) {
-        console.error(err);
-        await supabaseClient.auth.signOut();
-        window.location.replace('/login.html');
-      }
+    // protect route: ensure superadmin
+    const s = getState();
+    if(!s.user) return window.location.href = '/login.html';
+    if(!s.isSuper) {
+      await import('/js/auth/session.js').then(m=>m.clearSession());
+      return window.location.href = '/login.html';
     }
-    document.getElementById('btn-logout').addEventListener('click', async () => {
-      await supabaseClient.auth.signOut();
-      window.location.replace('/login.html');
-    });
-    protectAdmin();
   </script>
 </body>
 </html>

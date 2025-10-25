@@ -3,43 +3,44 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CMS.PANDDA</title>
-  <link rel="stylesheet" href="/src/entities/login/login.css" />
+  <title>Pandda — Painel</title>
+  <link rel="stylesheet" href="/css/globals.css" />
+  <link rel="stylesheet" href="/css/theme.css" />
+  <link rel="stylesheet" href="/css/topbar.css" />
+  <link rel="stylesheet" href="/css/sidebar.css" />
 </head>
 <body class="theme-dark">
-  <main style="display:flex;align-items:center;justify-content:center;height:100vh;padding:24px">
-    <div style="text-align:center;color:var(--text);max-width:520px">
-      <img src="/assets/logo.png" alt="logo" style="width:72px;height:72px;display:block;margin:0 auto 12px" />
-      <h1 style="margin:0 0 8px">CMS.PANDDA</h1>
-      <p style="margin:0 0 18px;color:var(--muted)">Verificando sessão… você será redirecionado em instantes.</p>
-      <div id="status" style="color:var(--muted)"></div>
+  <div id="app" class="app-root">
+    <aside id="sidebar-container" class="sidebar-container"></aside>
+    <div class="main-area">
+      <header id="topbar-container" class="topbar-container"></header>
+      <main id="view-root" class="view-root" role="main" aria-live="polite">
+        <section class="placeholder">
+          <h1>Carregando painel…</h1>
+        </section>
+      </main>
     </div>
-  </main>
+  </div>
 
   <script src="/_env.js"></script>
   <script type="module">
-    import { createSupabaseClient, getProfile } from '/src/core/supabase.js';
+    import { createSupabaseClient } from '/src/core/supabase.js';
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    import { initialize as initSession } from '/js/auth/session.js';
+    import '/js/components/sidebar.js';
+    import '/js/components/topbar.js';
+    import '/js/app.js';
 
-    const supabaseClient = createSupabaseClient(createClient);
-    const statusEl = document.getElementById('status');
-    function setStatus(msg){ if(statusEl) statusEl.textContent = msg; }
     (async function bootstrap(){
+      const supabaseClient = createSupabaseClient(createClient);
+      // expose client for debug/legacy modules if needed
+      window.__SUPABASE_CLIENT = supabaseClient;
       try {
-        setStatus('Carregando sessão...');
-        const { data } = await supabaseClient.auth.getUser();
-        const user = data?.user || null;
-        if (!user) { setStatus('Nenhuma sessão encontrada. Redirecionando para login...'); return window.location.replace('/login.html'); }
-        setStatus('Recuperando perfil...');
-        const profile = await getProfile(supabaseClient, user.id);
-        if (!profile) { setStatus('Perfil não encontrado. Finalizando sessão e redirecionando...'); await supabaseClient.auth.signOut(); return window.location.replace('/login.html'); }
-        if (profile.role === 'superadmin') { setStatus('Bem-vindo administrador. Redirecionando...'); return window.location.replace('/admin.html'); }
-        else { setStatus('Bem-vindo. Redirecionando...'); return window.location.replace('/user.html'); }
+        await initSession(supabaseClient);
       } catch (err) {
-        console.error('Erro ao validar sessão:', err);
-        try { await supabaseClient.auth.signOut(); } catch (_) {}
-        return window.location.replace('/login.html');
+        console.warn('session init failed', err);
       }
+      // app.js router will run on load event
     })();
   </script>
 </body>

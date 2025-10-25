@@ -1,0 +1,4 @@
+/* theme toggle is managed by data-theme on html or body.theme-* */
+html[data-theme="light"], body.theme-light {
+  background: linear-gradient(180deg, rgba(255,255,255,0.6), transparent), var(--bg);
+}
