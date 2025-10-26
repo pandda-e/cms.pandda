@@ -1,4 +1,3 @@
-/* sidebar.css — modernizada, transições rápidas, hover-expands temporário */
 :root{
   --sidebar-w: 260px;
   --sidebar-collapsed-w: 72px;
@@ -13,8 +12,12 @@
 /* container */
 .sidebar-container { position: fixed; inset: 0; pointer-events: none; z-index: 1000; }
 .sidebar-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-  opacity: 0; pointer-events: none; transition: opacity 160ms ease;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
 }
 
 /* base */
@@ -39,7 +42,11 @@
 
 /* desktop offset under topbar */
 @media (min-width: 992px) {
-  .sidebar { top: var(--topbar-offset); height: calc(100vh - var(--topbar-offset)); transform: translateX(0); }
+  .sidebar {
+    top: var(--topbar-offset);
+    height: calc(100vh - var(--topbar-offset));
+    transform: translateX(0);
+  }
 }
 
 /* header */
@@ -99,11 +106,41 @@
 
 /* mobile: overlay behavior */
 @media (max-width: 991px) {
-  .sidebar { transform: translateX(-100%); width: var(--sidebar-w); max-width: 80vw; top:0; height:100vh; }
-  .sidebar.collapsed { width: var(--sidebar-w); }
-  .sidebar-container.open .sidebar { transform: translateX(0); }
-  .sidebar-container.open .sidebar-overlay { opacity:1; pointer-events:auto; }
-  .sidebar-overlay { display:block; opacity:0; transition: opacity 160ms ease; }
+  .sidebar {
+    transform: translateX(-100%);
+    position: fixed;
+    left: 0;
+    top: var(--topbar-offset);
+    height: calc(100vh - var(--topbar-offset));
+    width: var(--sidebar-w);
+    max-width: 80vw;
+    z-index: 1100;
+  }
+
+  .sidebar.collapsed {
+    width: var(--sidebar-w);
+  }
+
+  .sidebar-container.open .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar-container.open .sidebar-overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebar-overlay {
+    display: block;
+    opacity: 0;
+    transition: opacity 180ms ease;
+    position: fixed;
+    inset: 0;
+    top: var(--topbar-offset);
+    height: calc(100vh - var(--topbar-offset));
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1000;
+  }
 }
 
 /* small polishes */
