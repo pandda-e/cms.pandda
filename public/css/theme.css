@@ -1,9 +1,12 @@
 /* public/css/theme.css
-   Complete file ensuring theme variables apply to sidebar and top-level UI.
+   Complete theme variables and layout rules.
+   Includes topbar fixed layout and sidebar theme variables.
 */
 
-/* Default (dark) theme variables */
+/* Core variables (dark defaults) */
 :root {
+  --topbar-height: 64px;
+
   --bg: #0f1720;
   --card: #0b1220;
   --muted: #9aa4b2;
@@ -14,6 +17,7 @@
   --glass: rgba(255,255,255,0.03);
   --radius: 10px;
   --shadow: 0 8px 26px rgba(2,6,23,0.6);
+
   --sidebar-bg: #0b1220;
   --sidebar-foreground: #e6eef8;
 }
@@ -29,6 +33,7 @@ html[data-theme="light"], body.theme-light {
   --surface: #ffffff;
   --glass: rgba(2,6,23,0.03);
   --shadow: 0 8px 30px rgba(12,18,26,0.06);
+
   --sidebar-bg: #ffffff;
   --sidebar-foreground: #071026;
 }
@@ -39,19 +44,48 @@ html[data-theme="dark"], body.theme-dark {
   --sidebar-foreground: #e6eef8;
 }
 
-/* Apply variables to core elements */
+/* Body and content colors */
 body {
   background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--bg);
   color: var(--text);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
 }
 
-/* Topbar uses theme variables */
+/* Topbar styling and fixed layout (topbar sits above page flow) */
 .topbar {
+  height: var(--topbar-height);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 16px;
   background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
-  color: var(--text);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  backdrop-filter: blur(6px);
+
+  /* Fixed positioning without overlaying content: topbar is fixed, main-area gets top margin */
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 1200;
 }
 
-/* Sidebar usage (kept here for certainty) */
+/* Ensure topbar children inherit colors */
+.topbar, .topbar * { color: var(--text); }
+
+/* Main area moved below topbar so topbar doesn't overlap content */
+.main-area {
+  margin-top: var(--topbar-height);
+  transition: margin-left 220ms cubic-bezier(.2,.9,.2,1);
+}
+
+/* Ensure topbar is visually above sidebar when necessary */
+@media (min-width: 992px) {
+  .topbar { z-index: 1200; }
+}
+
+/* Sidebar theme glue (keeps colors consistent with theme) */
 .sidebar {
   background: var(--sidebar-bg);
   color: var(--sidebar-foreground);
@@ -60,14 +94,11 @@ body {
 .sidebar .sidebar-header { background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent); border-bottom: 1px solid rgba(255,255,255,0.03); }
 .sidebar .sidebar-list .sidebar-link { color: inherit; }
 
-/* Ensure collapsed hover expansion respects theme z-index and shadow */
-.sidebar.collapsed:hover { box-shadow: 6px 0 30px rgba(0,0,0,0.32); }
-
-/* Ensure link contrast on light theme */
+/* Hover states contrast adjustments on light theme */
 html[data-theme="light"] .sidebar .sidebar-list .sidebar-link:hover {
   background: rgba(2,6,23,0.03);
 }
 
-/* Minimal resets for consistency */
+/* Accessibility and small polish */
 .sidebar .sidebar-list .label { color: var(--sidebar-foreground); }
 .sidebar .sidebar-list .icon { color: var(--sidebar-foreground); }

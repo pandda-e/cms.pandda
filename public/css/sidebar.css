@@ -1,9 +1,10 @@
 /* public/css/sidebar.css
-   Complete file with desktop collapsed (icons-only), smooth hover-expand transition,
-   mobile behavior preserved, and cleaned controls (no extra mobile positioning button).
+   Complete sidebar styles with desktop collapsed (icons-only),
+   smooth hover-expand transition, mobile behavior preserved,
+   and layout under the fixed topbar.
 */
 
-/* Base sidebar */
+/* Container that holds overlay and sidebar */
 .sidebar-container {
   position: fixed;
   inset: 0 0 0 0;
@@ -11,6 +12,8 @@
   z-index: 1000;
   display: block;
 }
+
+/* Overlay for mobile drawer */
 .sidebar-overlay {
   display: none;
   position: fixed;
@@ -21,6 +24,8 @@
   pointer-events: none;
   will-change: opacity;
 }
+
+/* Base sidebar (desktop defaults adjusted below) */
 .sidebar {
   width: 260px;
   max-width: 260px;
@@ -39,6 +44,17 @@
   -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
+  z-index: 1100;
+}
+
+/* Ensure sidebar sits under the topbar on desktop (top offset equals topbar height) */
+@media (min-width: 992px) {
+  .sidebar {
+    top: var(--topbar-height);
+    height: calc(100vh - var(--topbar-height));
+    transform: translateX(0);
+    position: fixed;
+  }
 }
 
 /* Sidebar header */
@@ -54,8 +70,7 @@
 .sidebar-header .brand .logo { width:36px; height:36px; border-radius:8px; background:var(--glass); }
 
 /* header buttons */
-.sidebar-close-btn,
-.sidebar-min-btn {
+.sidebar-close-btn {
   margin-left: auto;
   background: transparent;
   border: none;
@@ -65,8 +80,7 @@
   padding: 6px;
   border-radius: 6px;
 }
-.sidebar-close-btn:hover,
-.sidebar-min-btn:hover { background: rgba(255,255,255,0.02); }
+.sidebar-close-btn:hover { background: rgba(255,255,255,0.02); }
 
 /* List */
 .sidebar-list {
@@ -96,8 +110,7 @@
 @media (min-width: 992px) {
   .sidebar-container { position: static; pointer-events: auto; display: block; }
   .sidebar-overlay { display: none !important; opacity: 0; pointer-events: none; }
-  .sidebar { transform: translateX(0); position: relative; height: auto; box-shadow: none; max-width: 260px; }
-  .sidebar-close-btn { display: none; }
+  .sidebar { position: fixed; left: 0; top: var(--topbar-height); box-shadow: none; max-width: 260px; }
 }
 
 /* Collapsed (desktop) - icons-only */
@@ -133,21 +146,12 @@
 .sidebar.collapsed .sidebar-header .brand .title,
 .sidebar.collapsed .sidebar-header .brand .brand-title { display: none; }
 
-/* Minimize button visual when collapsed */
-.sidebar.collapsed .sidebar-min-btn {
-  transform: rotate(90deg);
-  padding: 6px;
-  margin-left: auto;
-}
-
 /* Smooth hover-expand: expand width on hover with smooth transition */
-.sidebar.collapsed {
-  will-change: width;
-}
+.sidebar.collapsed { will-change: width; }
 .sidebar.collapsed:hover {
   width: 260px;
   max-width: 80vw;
-  z-index: 1100;
+  z-index: 1200;
   box-shadow: 6px 0 30px rgba(0,0,0,0.32);
 }
 .sidebar.collapsed:hover .label {
@@ -158,15 +162,12 @@
   transition: visibility 60ms ease;
 }
 
-/* main-area spacing adjustments when sidebar is present */
+/* main-area spacing adjustments when sidebar is present (desktop) */
 @media (min-width: 992px) {
   body .main-area { transition: margin-left 220ms cubic-bezier(.2,.9,.2,1); margin-left: 260px; }
   .sidebar.collapsed ~ .main-area, .sidebar.collapsed + .main-area { margin-left: 72px; }
   .sidebar:not(.collapsed) ~ .main-area, .sidebar:not(.collapsed) + .main-area { margin-left: 260px; }
 }
-
-/* Remove mobile-only positioning control: ensure collapse btn doesn't appear as mobile-position toggle */
-.sidebar-min-btn { display:inline-flex; align-items:center; justify-content:center; }
 
 /* Mobile behavior */
 @media (max-width: 991px) {
@@ -191,5 +192,5 @@
 /* Thin divider for collapsed mode */
 .sidebar.collapsed { border-right: 1px solid rgba(255,255,255,0.03); }
 
-/* Accessibility focus styles */
+/* Focus styles */
 .sidebar-link:focus { outline: 3px solid color-mix(in srgb, var(--accent, #6ee7b7) 30%, transparent); outline-offset: 2px; }
