@@ -1,6 +1,9 @@
 // public/js/components/topbar.js
-// Topbar ensures hamburger toggles sidebar and the topbar layout remains as requested.
-// No structural change needed beyond ensuring left alignment of controls in markup here.
+// Topbar with robust hamburger handler:
+// - guaranteed to call window.togglePanddaSidebar()
+// - lazy-inits sidebar module if needed
+// - idempotent listener attachment
+// - logs a debug message when hamburger is clicked (helpful for verification)
 
 function createEl(tag, attrs = {}, children = []) {
   const el = document.createElement(tag);
@@ -19,7 +22,6 @@ function createEl(tag, attrs = {}, children = []) {
 }
 
 function createTopbarStructure() {
-  // Left-aligned group: hamburger + brand
   const hamburger = createEl('button', {
     class: 'topbar-hamburger',
     'aria-label': 'Abrir menu',
@@ -34,7 +36,6 @@ function createTopbarStructure() {
 
   const left = createEl('div', { class: 'left' }, [hamburger, brand]);
 
-  // Actions are kept but visually placed to the right; item alignment in sidebar controlled separately.
   const themeBtn = createEl('button', { id: 'btn-theme-toggle', class: 'button', title: 'Alternar tema', type: 'button' }, ['🌓']);
   const userEmail = createEl('div', { id: 'topbar-user-email', class: 'small', text: '—' });
   const logoutBtn = createEl('button', { id: 'btn-logout', class: 'button', type: 'button' }, ['Sair']);
@@ -84,16 +85,22 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
   }
 
   function bindHandlers() {
-    hamburger.addEventListener('click', async (e) => {
-      e.preventDefault();
-      try {
-        const ok = await ensureSidebarAndToggle();
-        if (!ok) console.warn('topbar: sidebar toggle did not run');
-      } catch (err) {
-        console.warn('topbar: error toggling sidebar', err);
-      }
-    });
+    // robust hamburger handler with idempotent attachment
+    if (!hamburger.__pandda_hotfix_attached) {
+      hamburger.__pandda_hotfix_attached = true;
+      hamburger.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+          console.log('topbar: hamburger clicked'); // debug marker to confirm listener execution
+          const ok = await ensureSidebarAndToggle();
+          if (!ok) console.warn('topbar: sidebar toggle did not run');
+        } catch (err) {
+          console.warn('topbar: error toggling sidebar', err);
+        }
+      }, { passive: false });
+    }
 
+    // theme toggle fallback
     themeBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
@@ -112,6 +119,7 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
       } catch (err) { console.warn('theme toggle failed', err); }
     });
 
+    // logout
     logoutBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
@@ -130,6 +138,7 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
       try { location.replace('/login.html'); } catch(_) {}
     });
 
+    // populate user email and keep updated
     (async () => {
       try {
         const sessionMod = await import('/js/auth/session.js');

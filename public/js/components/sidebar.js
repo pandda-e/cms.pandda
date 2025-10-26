@@ -1,8 +1,9 @@
 // public/js/components/sidebar.js
 // Responsive sidebar with desktop collapse/expand (icons-only).
-// - Removed sidebar-close-btn entirely (no DOM created).
-// - Sidebar items aligned to the left visually via CSS hooks (CSS already present).
-// - Adds "active" state to the last-clicked/view-active item; watches hash changes to set active item.
+// - Removed sidebar-close-btn entirely
+// - Items mark themselves active on click and on navigation changes
+// - Exposes window.togglePanddaSidebar for topbar to call
+// - Idempotent setup via container.__sidebar_inited
 
 export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) {
   const container = document.getElementById(sidebarContainerId);
@@ -161,7 +162,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   function toggleCollapsedDesktop() {
     const collapsed = sidebar.classList.toggle('collapsed');
     try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0'); } catch(_) {}
-    // when toggling collapsed state, ensure active label visibility is consistent
   }
 
   // initialize collapsed according to saved state and viewport
@@ -214,25 +214,19 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
 
   // Active-route helpers -------------------------------------------------
   function getCurrentRoute() {
-    // prefer location.hash route (#/something) else pathname
     const h = location.hash || '';
     if (h.startsWith('#/')) return h.replace('#/', '');
-    // fallback to pathname
     return location.pathname.replace(/^\//, '');
   }
 
   function setActiveRoute(route) {
     const list = sidebar.querySelector('#sidebar-list');
     if (!list) return;
-    // normalize
     const normalized = (route || '').toString().replace(/^\//, '').replace(/\/$/, '');
-    // remove existing active
     list.querySelectorAll('.sidebar-link.active').forEach(el => el.classList.remove('active'));
-    // find matching link by data-route or href
     const candidate = list.querySelector(`.sidebar-link[data-route="${normalized}"], .sidebar-link[href="#/${normalized}"], .sidebar-link[href="/${normalized}"]`);
     if (candidate) {
       candidate.classList.add('active');
-      // ensure that when collapsed the active item is visible (optional: scroll into view)
       candidate.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
   }
