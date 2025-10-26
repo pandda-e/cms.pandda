@@ -1,5 +1,13 @@
-/* topbar.css — modern, fixed */
-:root{ --topbar-h:64px; --glass: rgba(255,255,255,0.03); --accent: var(--accent, #6ee7b7); }
+/* topbar.css — modern, fixed, improved contrast and elevation in light theme */
+:root{
+  --topbar-h:64px;
+  --glass: rgba(255,255,255,0.03);
+  --accent: var(--accent, #6ee7b7);
+  --topbar-radius: 10px; /* ajuste se quiser cantos mais ou menos arredondados */
+  --topbar-elev: 0 8px 22px rgba(12,18,26,0.06);
+}
+
+/* Base topbar */
 .topbar {
   height: var(--topbar-h);
   display:flex;
@@ -9,8 +17,36 @@
   background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
   border-bottom: 1px solid rgba(255,255,255,0.03);
   backdrop-filter: blur(6px);
-  position: fixed; left:0; right:0; top:0; z-index: 1200;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 1300; /* garantir que topbar fique acima da sidebar em mobile */
+  transition: background 180ms ease, box-shadow 180ms ease, border-radius 180ms ease;
 }
+
+/* Make topbar visually distinct in light theme */
+html[data-theme="light"] .topbar,
+body.theme-light .topbar {
+  background: linear-gradient(180deg, rgba(2,6,23,0.03), rgba(2,6,23,0.01));
+  border-bottom: 1px solid rgba(12,18,26,0.06);
+  box-shadow: var(--topbar-elev);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Optional rounded topbar: only on wider screens where it makes sense */
+@media (min-width: 992px) {
+  html[data-theme="light"] .topbar,
+  body.theme-light .topbar {
+    border-radius: var(--topbar-radius);
+    margin: 8px 16px 0 16px;
+    left: 16px;
+    right: 16px;
+  }
+}
+
+/* layout */
 .topbar .left { display:flex; align-items:center; gap:12px; }
 .topbar .brand { display:flex; align-items:center; gap:12px; }
 .topbar .brand .logo { width:40px; height:40px; border-radius:8px; background:var(--glass); display:inline-block; }
@@ -24,13 +60,16 @@
 }
 .topbar-hamburger:hover { background: rgba(255,255,255,0.02); transform: translateY(-1px); }
 
-/* buttons */
+/* buttons and small text */
 .button { background:transparent; border:0; padding:8px; border-radius:8px; cursor:pointer; color:inherit; font-size:14px; }
 #topbar-user-email { font-size:13px; color:var(--muted); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-/* responsive */
+/* responsive adjustments */
 @media (max-width:820px) {
   .topbar { height:56px; padding:0 12px; }
   .topbar .brand .title { display:none; }
   #topbar-user-email { display:none; }
 }
+
+/* small polish for focus */
+.topbar-hamburger:focus, .button:focus { outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset:2px; }
