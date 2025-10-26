@@ -1,6 +1,6 @@
 /* public/css/theme.css
-   Complete theme variables and layout rules.
-   Includes topbar fixed layout and sidebar theme variables.
+   Theme variables and topbar/layout glue.
+   Includes --topbar-height and ensures topbar fills horizontal width.
 */
 
 /* Core variables (dark defaults) */
@@ -44,7 +44,7 @@ html[data-theme="dark"], body.theme-dark {
   --sidebar-foreground: #e6eef8;
 }
 
-/* Body and content colors */
+/* Body and content */
 body {
   background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--bg);
   color: var(--text);
@@ -52,7 +52,7 @@ body {
   -moz-osx-font-smoothing:grayscale;
 }
 
-/* Topbar styling and fixed layout (topbar sits above page flow) */
+/* Topbar fixed and full width (pushes content below via .main-area margin-top) */
 .topbar {
   height: var(--topbar-height);
   display:flex;
@@ -63,7 +63,6 @@ body {
   border-bottom: 1px solid rgba(255,255,255,0.03);
   backdrop-filter: blur(6px);
 
-  /* Fixed positioning without overlaying content: topbar is fixed, main-area gets top margin */
   position: fixed;
   left: 0;
   right: 0;
@@ -71,21 +70,16 @@ body {
   z-index: 1200;
 }
 
-/* Ensure topbar children inherit colors */
+/* Ensure children inherit colors */
 .topbar, .topbar * { color: var(--text); }
 
-/* Main area moved below topbar so topbar doesn't overlap content */
+/* Main area moved below topbar */
 .main-area {
   margin-top: var(--topbar-height);
   transition: margin-left 220ms cubic-bezier(.2,.9,.2,1);
 }
 
-/* Ensure topbar is visually above sidebar when necessary */
-@media (min-width: 992px) {
-  .topbar { z-index: 1200; }
-}
-
-/* Sidebar theme glue (keeps colors consistent with theme) */
+/* Sidebar theme glue */
 .sidebar {
   background: var(--sidebar-bg);
   color: var(--sidebar-foreground);
@@ -94,11 +88,14 @@ body {
 .sidebar .sidebar-header { background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent); border-bottom: 1px solid rgba(255,255,255,0.03); }
 .sidebar .sidebar-list .sidebar-link { color: inherit; }
 
-/* Hover states contrast adjustments on light theme */
+/* Light-theme hover contrast */
 html[data-theme="light"] .sidebar .sidebar-list .sidebar-link:hover {
   background: rgba(2,6,23,0.03);
 }
 
-/* Accessibility and small polish */
+/* Ensure collapsed hover uses correct z-index so topbar remains on top */
+.sidebar.collapsed:hover { box-shadow: 6px 0 30px rgba(0,0,0,0.32); z-index: 1200; }
+
+/* Accent and small polish */
 .sidebar .sidebar-list .label { color: var(--sidebar-foreground); }
 .sidebar .sidebar-list .icon { color: var(--sidebar-foreground); }

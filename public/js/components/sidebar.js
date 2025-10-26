@@ -1,9 +1,8 @@
 // public/js/components/sidebar.js
 // Responsive sidebar with desktop collapse/expand (icons-only).
-// Removed internal minimize button. Topbar hamburger (data-sidebar-toggle) controls:
-// - on mobile: open/close drawer
-// - on desktop: toggle collapsed state (icons-only)
-// Exports: setupSidebar({ sidebarContainerId = 'sidebar-container' })
+// - Removed sidebar-close-btn entirely (no DOM created).
+// - Sidebar items aligned to the left visually via CSS hooks (CSS already present).
+// - Adds "active" state to the last-clicked/view-active item; watches hash changes to set active item.
 
 export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) {
   const container = document.getElementById(sidebarContainerId);
@@ -14,7 +13,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
 
   let overlay = container.querySelector('#sidebar-overlay');
   let sidebar = container.querySelector('#sidebar');
-  let closeBtn = container.querySelector('#sidebar-close-btn');
 
   if (!overlay) {
     overlay = document.createElement('div');
@@ -30,7 +28,7 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     sidebar.setAttribute('role', 'navigation');
     sidebar.setAttribute('aria-label', 'Sidebar');
 
-    // header: brand + close (mobile)
+    // header: brand only (no close/minimize buttons here)
     const header = document.createElement('div');
     header.className = 'sidebar-header';
     const brandWrap = document.createElement('div');
@@ -44,16 +42,7 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     title.innerHTML = '<div style="font-weight:700">Pandda</div><div class="small">Painel</div>';
     brandWrap.appendChild(title);
 
-    // close for mobile
-    closeBtn = document.createElement('button');
-    closeBtn.id = 'sidebar-close-btn';
-    closeBtn.className = 'sidebar-close-btn';
-    closeBtn.setAttribute('aria-label', 'Fechar menu');
-    closeBtn.type = 'button';
-    closeBtn.textContent = '✕';
-
     header.appendChild(brandWrap);
-    header.appendChild(closeBtn);
     sidebar.appendChild(header);
 
     const list = document.createElement('ul');
@@ -62,8 +51,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     sidebar.appendChild(list);
 
     container.appendChild(sidebar);
-  } else {
-    closeBtn = closeBtn || sidebar.querySelector('#sidebar-close-btn');
   }
 
   // helper to create items (attrs must be plain object)
@@ -74,6 +61,7 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     a.href = href;
     a.className = 'sidebar-link';
     a.setAttribute('data-route', href.startsWith('#/') ? href.replace('#/','') : href);
+    a.setAttribute('role', 'button');
 
     const iconEl = document.createElement('span');
     iconEl.className = 'icon';
@@ -92,6 +80,15 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
         try { a.setAttribute(k, String(attrs[k])); } catch(_) { /* ignore invalid names */ }
       }
     }
+
+    // clicking an item marks it active and closes on mobile
+    a.addEventListener('click', (e) => {
+      // allow normal anchor navigation; set active class
+      setActiveRoute(a.getAttribute('data-route') || href);
+      if (isMobile()) {
+        closeSidebar();
+      }
+    });
 
     li.appendChild(a);
     return li;
@@ -129,6 +126,9 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     } catch (_) {
       // session module not available; skip admins link
     }
+
+    // after building, set active based on current hash/route
+    setActiveRoute(getCurrentRoute());
   }
 
   // collapsed state
@@ -161,6 +161,7 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   function toggleCollapsedDesktop() {
     const collapsed = sidebar.classList.toggle('collapsed');
     try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0'); } catch(_) {}
+    // when toggling collapsed state, ensure active label visibility is consistent
   }
 
   // initialize collapsed according to saved state and viewport
@@ -177,10 +178,7 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   // overlay click closes on mobile
   overlay.addEventListener('click', () => { if (isMobile()) closeSidebar(); });
 
-  // close button
-  if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
-
-  // click outside to close on mobile
+  // click outside to close on mobile (delegation)
   document.addEventListener('click', (e) => {
     if (!isMobile()) return;
     if (!sidebar) return;
@@ -201,23 +199,49 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
 
   // expose global toggle used by topbar hamburger
   window.togglePanddaSidebar = function() {
-    // if mobile, toggle drawer; else toggle collapsed state
     if (isMobile()) toggleSidebarMobile();
     else toggleCollapsedDesktop();
   };
 
-  // Additionally, listen to clicks on any element with data-sidebar-toggle (supports elements added later)
+  // delegation from topbar (ensures clicks on elements with data-sidebar-toggle also work)
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-sidebar-toggle]');
     if (!btn) return;
     e.preventDefault();
-    // ensure sidebar module ready
-    try {
-      if (isMobile()) toggleSidebarMobile();
-      else toggleCollapsedDesktop();
-    } catch (_) {}
+    if (isMobile()) toggleSidebarMobile();
+    else toggleCollapsedDesktop();
   });
 
+  // Active-route helpers -------------------------------------------------
+  function getCurrentRoute() {
+    // prefer location.hash route (#/something) else pathname
+    const h = location.hash || '';
+    if (h.startsWith('#/')) return h.replace('#/', '');
+    // fallback to pathname
+    return location.pathname.replace(/^\//, '');
+  }
+
+  function setActiveRoute(route) {
+    const list = sidebar.querySelector('#sidebar-list');
+    if (!list) return;
+    // normalize
+    const normalized = (route || '').toString().replace(/^\//, '').replace(/\/$/, '');
+    // remove existing active
+    list.querySelectorAll('.sidebar-link.active').forEach(el => el.classList.remove('active'));
+    // find matching link by data-route or href
+    const candidate = list.querySelector(`.sidebar-link[data-route="${normalized}"], .sidebar-link[href="#/${normalized}"], .sidebar-link[href="/${normalized}"]`);
+    if (candidate) {
+      candidate.classList.add('active');
+      // ensure that when collapsed the active item is visible (optional: scroll into view)
+      candidate.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }
+
+  // update active on hashchange/navigation
+  window.addEventListener('hashchange', () => setActiveRoute(getCurrentRoute()));
+  window.addEventListener('popstate', () => setActiveRoute(getCurrentRoute()));
+
+  // initial render
   buildList().catch(()=>{});
 
   const api = {
@@ -230,7 +254,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   return api;
 }
 
-// Auto-init on load
 if (typeof window !== 'undefined') {
   window.addEventListener('load', () => {
     try { setupSidebar(); } catch (_) {}

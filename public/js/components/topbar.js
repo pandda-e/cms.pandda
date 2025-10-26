@@ -1,9 +1,6 @@
 // public/js/components/topbar.js
-// Topbar built with DOM methods only. Ensures hamburger always toggles sidebar:
-// - if window.togglePanddaSidebar exists, call it
-// - otherwise lazy-load /js/components/sidebar.js, run setupSidebar, then call toggle
-// Exports: mountTopbar(container = '#topbar-container')
-// Idempotent mount.
+// Topbar ensures hamburger toggles sidebar and the topbar layout remains as requested.
+// No structural change needed beyond ensuring left alignment of controls in markup here.
 
 function createEl(tag, attrs = {}, children = []) {
   const el = document.createElement(tag);
@@ -22,6 +19,7 @@ function createEl(tag, attrs = {}, children = []) {
 }
 
 function createTopbarStructure() {
+  // Left-aligned group: hamburger + brand
   const hamburger = createEl('button', {
     class: 'topbar-hamburger',
     'aria-label': 'Abrir menu',
@@ -36,6 +34,7 @@ function createTopbarStructure() {
 
   const left = createEl('div', { class: 'left' }, [hamburger, brand]);
 
+  // Actions are kept but visually placed to the right; item alignment in sidebar controlled separately.
   const themeBtn = createEl('button', { id: 'btn-theme-toggle', class: 'button', title: 'Alternar tema', type: 'button' }, ['🌓']);
   const userEmail = createEl('div', { id: 'topbar-user-email', class: 'small', text: '—' });
   const logoutBtn = createEl('button', { id: 'btn-logout', class: 'button', type: 'button' }, ['Sair']);
@@ -60,26 +59,22 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
   if (container.__topbar_mounted) return container.__topbar_api || null;
   container.__topbar_mounted = true;
 
-  // Ensure topbar is single instance
   while (container.firstChild) container.removeChild(container.firstChild);
 
   const { topbar, hamburger, themeBtn, logoutBtn, userEmail } = createTopbarStructure();
   container.appendChild(topbar);
 
   async function ensureSidebarAndToggle() {
-    // prefer global if present
     if (typeof window.togglePanddaSidebar === 'function') {
       try { window.togglePanddaSidebar(); return true; } catch(e){ /* fallback */ }
     }
-    // try lazy-load sidebar module and initialize
     try {
       const mod = await import('/js/components/sidebar.js').catch(err => { throw err; });
       if (mod && typeof mod.setupSidebar === 'function') {
         try { await mod.setupSidebar(); } catch(_) {}
-        // small wait to allow module to set global
         await new Promise(r => setTimeout(r, 30));
         if (typeof window.togglePanddaSidebar === 'function') {
-          try { window.togglePanddaSidebar(); return true; } catch(e){ /* ignore */ }
+          try { window.togglePanddaSidebar(); return true; } catch(e){}
         }
       }
     } catch (err) {
@@ -88,9 +83,7 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
     return false;
   }
 
-  // Bind handlers
   function bindHandlers() {
-    // Hamburger: robust toggle
     hamburger.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
@@ -101,7 +94,6 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
       }
     });
 
-    // Theme toggle: prefer module, fallback to window.toggleTheme and DOM fallback
     themeBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
@@ -120,7 +112,6 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
       } catch (err) { console.warn('theme toggle failed', err); }
     });
 
-    // Logout: prefer session module signOut/clearSession
     logoutBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
@@ -139,7 +130,6 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
       try { location.replace('/login.html'); } catch(_) {}
     });
 
-    // populate user email and keep updated
     (async () => {
       try {
         const sessionMod = await import('/js/auth/session.js');
@@ -168,7 +158,6 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
   return api;
 }
 
-// Auto-mount on load if container exists
 if (typeof window !== 'undefined') {
   window.addEventListener('load', () => {
     try { mountTopbar('#topbar-container').catch(()=>{}); } catch(_) {}

@@ -1,10 +1,12 @@
 /* public/css/sidebar.css
-   Complete sidebar styles with desktop collapsed (icons-only),
-   smooth hover-expand transition, mobile behavior preserved,
-   and layout under the fixed topbar.
+   Complete sidebar styles including:
+   - left alignment of items
+   - visual highlight for active item
+   - small-left padding adjustments for tighter left alignment
+   - preserved collapsed/hover behavior
 */
 
-/* Container that holds overlay and sidebar */
+/* Container and overlay */
 .sidebar-container {
   position: fixed;
   inset: 0 0 0 0;
@@ -12,8 +14,6 @@
   z-index: 1000;
   display: block;
 }
-
-/* Overlay for mobile drawer */
 .sidebar-overlay {
   display: none;
   position: fixed;
@@ -25,7 +25,7 @@
   will-change: opacity;
 }
 
-/* Base sidebar (desktop defaults adjusted below) */
+/* Base sidebar */
 .sidebar {
   width: 260px;
   max-width: 260px;
@@ -47,7 +47,7 @@
   z-index: 1100;
 }
 
-/* Ensure sidebar sits under the topbar on desktop (top offset equals topbar height) */
+/* Desktop: place sidebar under topbar (top offset controlled in theme.css via --topbar-height) */
 @media (min-width: 992px) {
   .sidebar {
     top: var(--topbar-height);
@@ -57,7 +57,7 @@
   }
 }
 
-/* Sidebar header */
+/* Header */
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -69,20 +69,10 @@
 .sidebar-header .brand { margin: 0; font-size: 1.05rem; font-weight: 600; color: inherit; display:flex; align-items:center; gap:10px; }
 .sidebar-header .brand .logo { width:36px; height:36px; border-radius:8px; background:var(--glass); }
 
-/* header buttons */
-.sidebar-close-btn {
-  margin-left: auto;
-  background: transparent;
-  border: none;
-  color: inherit;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 6px;
-}
-.sidebar-close-btn:hover { background: rgba(255,255,255,0.02); }
+/* Header close button was removed; style left intact if other uses exist */
+.sidebar-close-btn { display: none; }
 
-/* List */
+/* List and items (LEFT aligned) */
 .sidebar-list {
   list-style: none;
   margin: 0;
@@ -92,28 +82,49 @@
   gap: 4px;
 }
 .sidebar-item { padding: 0; }
+
+/* Align icons and labels to the left with reduced left padding */
 .sidebar-link {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 10px 12px 10px 10px; /* tighter left padding */
+  padding-left: 10px;
   color: inherit;
   text-decoration: none;
   border-radius: 6px;
   transition: background 120ms ease, color 120ms ease, padding 180ms ease;
+  justify-content: flex-start; /* ensure left alignment */
 }
 .sidebar-link:hover { background: rgba(255,255,255,0.02); }
-.sidebar-link .icon { display:inline-block; width:28px; text-align:center; font-size:18px; }
+
+/* icon and label sizes */
+.sidebar-link .icon { display:inline-block; width:28px; text-align:center; font-size:18px; margin-left:2px; }
 .sidebar-link .label { display:inline-block; font-size:14px; color:inherit; }
 
-/* Desktop breakpoint: show sidebar statically, hide overlay */
-@media (min-width: 992px) {
-  .sidebar-container { position: static; pointer-events: auto; display: block; }
-  .sidebar-overlay { display: none !important; opacity: 0; pointer-events: none; }
-  .sidebar { position: fixed; left: 0; top: var(--topbar-height); box-shadow: none; max-width: 260px; }
+/* Active item styling: visible highlight and left accent */
+.sidebar-link.active {
+  background: linear-gradient(90deg, rgba(255,255,255,0.02), transparent);
+  color: var(--sidebar-foreground);
+  position: relative;
+  box-shadow: none;
+}
+.sidebar-link.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  border-radius: 4px;
+  background: var(--accent, #6ee7b7);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
 
-/* Collapsed (desktop) - icons-only */
+/* Ensure icon of active item can use accent color optionally */
+.sidebar-link.active .icon { color: var(--accent, #6ee7b7); }
+
+/* Collapsed (icons-only) */
 .sidebar.collapsed {
   width: 72px;
   max-width: 72px;
@@ -146,7 +157,18 @@
 .sidebar.collapsed .sidebar-header .brand .title,
 .sidebar.collapsed .sidebar-header .brand .brand-title { display: none; }
 
-/* Smooth hover-expand: expand width on hover with smooth transition */
+/* Ensure active indicator visible in collapsed mode (accent dot) */
+.sidebar.collapsed .sidebar-link.active::before {
+  left: 50%;
+  transform: translateX(-50%);
+  top: auto;
+  bottom: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Smooth hover-expand */
 .sidebar.collapsed { will-change: width; }
 .sidebar.collapsed:hover {
   width: 260px;
@@ -162,7 +184,7 @@
   transition: visibility 60ms ease;
 }
 
-/* main-area spacing adjustments when sidebar is present (desktop) */
+/* Main-area spacing adjustments when sidebar present (desktop) */
 @media (min-width: 992px) {
   body .main-area { transition: margin-left 220ms cubic-bezier(.2,.9,.2,1); margin-left: 260px; }
   .sidebar.collapsed ~ .main-area, .sidebar.collapsed + .main-area { margin-left: 72px; }
@@ -194,3 +216,6 @@
 
 /* Focus styles */
 .sidebar-link:focus { outline: 3px solid color-mix(in srgb, var(--accent, #6ee7b7) 30%, transparent); outline-offset: 2px; }
+
+/* Ensure labels/icons use theme variables */
+.sidebar .label, .sidebar .icon { color: var(--sidebar-foreground); }
