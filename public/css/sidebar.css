@@ -126,3 +126,88 @@
   pointer-events: auto;
   opacity: 1;
 }
+
+/* Collapsed (desktop) - exibe apenas ícones, largura reduzida */
+.sidebar.collapsed {
+  width: 72px; /* largura reduzida com ícones visíveis */
+  max-width: 72px;
+  overflow: visible;
+}
+
+/* Conteúdo: esconde rótulos, centraliza ícones */
+.sidebar.collapsed .sidebar-list .sidebar-item .label {
+  display: none;
+  visibility: hidden;
+  width: 0;
+  margin: 0;
+  padding: 0;
+  font-size: 0;
+}
+
+.sidebar.collapsed .sidebar-list .sidebar-item .icon {
+  display: inline-block;
+  width: 40px;
+  text-align: center;
+  font-size: 18px;
+  margin-right: 0;
+}
+
+/* Ajuste do header quando colapsado: centraliza logo e esconde texto */
+.sidebar.collapsed .sidebar-header .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+.sidebar.collapsed .sidebar-header .brand .brand-title,
+.sidebar.collapsed .sidebar-header .brand .title {
+  display: none;
+}
+
+/* Minimize button visual (mantém botão pequeno) */
+.sidebar.collapsed #sidebar-min-btn {
+  transform: rotate(90deg);
+  padding: 6px;
+  margin-left: auto;
+}
+
+/* Hover expand behavior (optional) — expande temporariamente ao passar o mouse */
+.sidebar.collapsed:hover {
+  width: 260px;
+  max-width: 80vw;
+  transition: width 180ms ease;
+  z-index: 1100;
+}
+.sidebar.collapsed:hover .sidebar-list .sidebar-item .label {
+  display: inline-block;
+  visibility: visible;
+  font-size: 14px;
+  margin-left: 8px;
+}
+
+/* Ensure desktop media rules keep collapsed style only on wider screens */
+@media (max-width: 991px) {
+  .sidebar.collapsed { width: 260px; max-width: 80vw; }
+  .sidebar.collapsed .sidebar-list .sidebar-item .label { display: inline-block; visibility: visible; font-size: 14px; margin-left: 8px; }
+  .sidebar.collapsed:hover { width: 260px; }
+}
+
+/* Small polish: reduce padding when collapsed so items align centered */
+.sidebar.collapsed .sidebar-list .sidebar-item > .sidebar-link,
+.sidebar.collapsed .sidebar-list .sidebar-item > a {
+  padding: 10px 8px;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+/* Optional: thin divider for collapsed mode */
+.sidebar.collapsed {
+  border-right: 1px solid rgba(255,255,255,0.03);
+}
+
+/* Topbar adjustment when sidebar collapsed (prevents overlap) */
+@media (min-width: 992px){
+  body .main-area { margin-left: 72px; transition: margin-left 180ms ease; }
+  .sidebar:not(.collapsed) ~ .main-area { margin-left: 260px; }
+}

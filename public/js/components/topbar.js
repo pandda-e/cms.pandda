@@ -1,14 +1,17 @@
 // public/js/components/topbar.js
-// Builds the topbar using DOM methods only (no innerHTML fetch or template injection).
+// Topbar built with DOM methods only. Adds theme toggle and logout button.
 // Exports: mountTopbar(container = '#topbar-container')
-// Safe to import multiple times; idempotent mount.
+// Idempotent mount.
+
+import('/src/core/theme.js').catch(()=>{}); // optional; theme functions may be accessible via global or module
+// We lazily import session and theme inside mount to avoid startup ordering issues.
 
 function createEl(tag, attrs = {}, children = []) {
   const el = document.createElement(tag);
   for (const k in attrs) {
     if (k === 'class') el.className = attrs[k];
     else if (k === 'text') el.textContent = attrs[k];
-    else if (k === 'html') el.innerHTML = attrs[k]; // reserved but not used by our code
+    else if (k === 'html') el.innerHTML = attrs[k];
     else if (k.startsWith('data-')) el.setAttribute(k, attrs[k]);
     else el.setAttribute(k, attrs[k]);
   }
@@ -20,23 +23,32 @@ function createEl(tag, attrs = {}, children = []) {
 }
 
 function createTopbarStructure() {
-  // left area: hamburger + brand
   const hamburger = createEl('button', {
     class: 'topbar-hamburger',
     'aria-label': 'Abrir menu',
     'data-sidebar-toggle': '1',
     type: 'button'
   }, ['☰']);
-  const brand = createEl('span', { class: 'brand', text: 'Pandda' });
 
-  const left = createEl('div', { class: 'topbar-left' }, [hamburger, brand]);
+  const brand = createEl('div', { class: 'brand' }, [
+    createEl('div', { class: 'logo', 'aria-hidden': 'true' }, []),
+    createEl('div', { class: 'title', text: 'Pandda' }, [])
+  ]);
 
-  // right area: search (optional) + profile button
-  const profileBtn = createEl('button', { id: 'topbar-profile-btn', class: 'topbar-btn', type: 'button' }, ['Conta']);
-  const right = createEl('div', { class: 'topbar-right' }, [profileBtn]);
+  const left = createEl('div', { class: 'left' }, [hamburger, brand]);
 
-  const topbar = createEl('div', { class: 'topbar' }, [left, right]);
-  return { topbar, hamburger, profileBtn };
+  // theme toggle
+  const themeBtn = createEl('button', { id: 'btn-theme-toggle', class: 'button', title: 'Alternar tema', type: 'button' }, ['🌓']);
+  // user area: email and logout
+  const userEmail = createEl('div', { id: 'topbar-user-email', class: 'small', text: '—' });
+  const logoutBtn = createEl('button', { id: 'btn-logout', class: 'button', type: 'button' }, ['Sair']);
+
+  const userMenu = createEl('div', { id: 'user-menu', class: 'row' }, [userEmail, logoutBtn]);
+
+  const actions = createEl('div', { class: 'actions row' }, [themeBtn, userMenu]);
+
+  const topbar = createEl('div', { class: 'topbar' }, [left, actions]);
+  return { topbar, hamburger, themeBtn, logoutBtn, userEmail };
 }
 
 export async function mountTopbar(containerSelector = '#topbar-container', opts = {}) {
@@ -49,19 +61,17 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
     return null;
   }
 
-  // idempotent: if already mounted, return existing api
   if (container.__topbar_mounted) return container.__topbar_api || null;
   container.__topbar_mounted = true;
 
-  // Clear any existing children to ensure single topbar
   while (container.firstChild) container.removeChild(container.firstChild);
 
-  const { topbar, hamburger, profileBtn } = createTopbarStructure();
+  const { topbar, hamburger, themeBtn, logoutBtn, userEmail } = createTopbarStructure();
   container.appendChild(topbar);
 
-  // Bind handlers
-  function bindHandlers() {
-    // Hamburger: toggle sidebar (exposed global or lazy-load)
+  // Bind handlers (lazy import for session/theme)
+  async function bindHandlers() {
+    // sidebar toggle
     hamburger.addEventListener('click', (e) => {
       e.preventDefault();
       if (typeof window.togglePanddaSidebar === 'function') {
@@ -69,25 +79,67 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
         return;
       }
       import('/js/components/sidebar.js').then(m => {
-        if (m && typeof m.setupSidebar === 'function') {
-          m.setupSidebar(); // ensures sidebar exists and sets window.togglePanddaSidebar
-        }
+        if (m && typeof m.setupSidebar === 'function') m.setupSidebar();
         if (typeof window.togglePanddaSidebar === 'function') window.togglePanddaSidebar();
       }).catch(err => console.warn('topbar: failed to lazy-load sidebar module', err));
     });
 
-    // Profile button: open account page or menu (non-destructive)
-    profileBtn.addEventListener('click', (e) => {
+    // theme toggle (try module then fallback to window.toggleTheme)
+    themeBtn.addEventListener('click', async (e) => {
       e.preventDefault();
-      // try to toggle an existing account menu inside container
-      const existingMenu = container.querySelector('.topbar-account-menu');
-      if (existingMenu) {
-        existingMenu.classList.toggle('open');
-        return;
-      }
-      // fallback: navigate to account page without reload loop
-      try { window.location.href = '/account.html'; } catch(_) {}
+      try {
+        const theme = await import('/src/core/theme.js').catch(()=>null);
+        if (theme && typeof theme.toggleTheme === 'function') {
+          theme.toggleTheme();
+          return;
+        }
+      } catch(_) {}
+      try {
+        if (typeof window.toggleTheme === 'function') window.toggleTheme();
+        else {
+          // simple toggle fallback using data-theme on documentElement
+          const cur = document.documentElement.getAttribute('data-theme') || (document.body.classList.contains('theme-dark') ? 'dark' : 'light');
+          const next = cur === 'light' ? 'dark' : 'light';
+          document.documentElement.setAttribute('data-theme', next);
+          document.body.classList.remove('theme-dark','theme-light');
+          document.body.classList.add(next === 'light' ? 'theme-light' : 'theme-dark');
+        }
+      } catch (err) { console.warn('theme toggle failed', err); }
     });
+
+    // logout button: prefer session module signOut/clearSession
+    logoutBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        const sessionMod = await import('/js/auth/session.js');
+        if (sessionMod && typeof sessionMod.signOut === 'function') {
+          await sessionMod.signOut();
+          return;
+        }
+        if (sessionMod && typeof sessionMod.clearSession === 'function') {
+          await sessionMod.clearSession();
+          return;
+        }
+      } catch (err) {
+        console.warn('logout via session module failed', err);
+      }
+      try { location.replace('/login.html'); } catch(_) {}
+    });
+
+    // populate user email if available
+    try {
+      const sessionMod = await import('/js/auth/session.js');
+      const state = sessionMod.getState ? sessionMod.getState() : {};
+      const email = state?.user?.email ?? '—';
+      userEmail.textContent = email;
+      // keep listener to update when session changes
+      sessionMod.onChange && sessionMod.onChange((st) => {
+        const e = st?.user?.email ?? '—';
+        userEmail.textContent = e;
+      });
+    } catch (err) {
+      // ignore
+    }
   }
 
   try { bindHandlers(); } catch (err) { console.warn('mountTopbar: bindHandlers failed', err); }
