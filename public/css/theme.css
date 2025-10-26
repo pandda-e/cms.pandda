@@ -1,4 +1,73 @@
-/* theme toggle is managed by data-theme on html or body.theme-* */
-html[data-theme="light"], body.theme-light {
-  background: linear-gradient(180deg, rgba(255,255,255,0.6), transparent), var(--bg);
+/* public/css/theme.css
+   Complete file ensuring theme variables apply to sidebar and top-level UI.
+*/
+
+/* Default (dark) theme variables */
+:root {
+  --bg: #0f1720;
+  --card: #0b1220;
+  --muted: #9aa4b2;
+  --text: #e6eef6;
+  --accent: #6ee7b7;
+  --accent-2: #7dd3fc;
+  --surface: #0b1220;
+  --glass: rgba(255,255,255,0.03);
+  --radius: 10px;
+  --shadow: 0 8px 26px rgba(2,6,23,0.6);
+  --sidebar-bg: #0b1220;
+  --sidebar-foreground: #e6eef8;
 }
+
+/* Light theme overrides */
+html[data-theme="light"], body.theme-light {
+  --bg: #f6f8fa;
+  --card: #ffffff;
+  --muted: #5b6b78;
+  --text: #071026;
+  --accent: #0b84ff;
+  --accent-2: #6ee7b7;
+  --surface: #ffffff;
+  --glass: rgba(2,6,23,0.03);
+  --shadow: 0 8px 30px rgba(12,18,26,0.06);
+  --sidebar-bg: #ffffff;
+  --sidebar-foreground: #071026;
+}
+
+/* Dark theme explicit */
+html[data-theme="dark"], body.theme-dark {
+  --sidebar-bg: #0b1220;
+  --sidebar-foreground: #e6eef8;
+}
+
+/* Apply variables to core elements */
+body {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--bg);
+  color: var(--text);
+}
+
+/* Topbar uses theme variables */
+.topbar {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  color: var(--text);
+}
+
+/* Sidebar usage (kept here for certainty) */
+.sidebar {
+  background: var(--sidebar-bg);
+  color: var(--sidebar-foreground);
+  border-right: 1px solid rgba(0,0,0,0.06);
+}
+.sidebar .sidebar-header { background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent); border-bottom: 1px solid rgba(255,255,255,0.03); }
+.sidebar .sidebar-list .sidebar-link { color: inherit; }
+
+/* Ensure collapsed hover expansion respects theme z-index and shadow */
+.sidebar.collapsed:hover { box-shadow: 6px 0 30px rgba(0,0,0,0.32); }
+
+/* Ensure link contrast on light theme */
+html[data-theme="light"] .sidebar .sidebar-list .sidebar-link:hover {
+  background: rgba(2,6,23,0.03);
+}
+
+/* Minimal resets for consistency */
+.sidebar .sidebar-list .label { color: var(--sidebar-foreground); }
+.sidebar .sidebar-list .icon { color: var(--sidebar-foreground); }
