@@ -21,7 +21,7 @@
   left: 0;
   right: 0;
   top: 0;
-  z-index: 1400; /* garantir topbar acima de overlays */
+  z-index: 1500; /* elevado para ficar acima do overlay/backdrop */
   transition: background 180ms ease, box-shadow 180ms ease, border-radius 180ms ease;
 }
 
@@ -35,7 +35,6 @@
 /* Apply same elevated look in dark theme as was on light */
 html[data-theme="dark"] .topbar,
 body.theme-dark .topbar {
-  /* use the same elevated variables to ensure parity */
   background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
   border-bottom: 1px solid rgba(255,255,255,0.03);
   box-shadow: var(--topbar-elev);

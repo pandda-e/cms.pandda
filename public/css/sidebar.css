@@ -8,7 +8,7 @@
   --transition-medium: 220ms;
   --topbar-offset: var(--topbar-height, 64px);
   --sidebar-overlay-radius: 12px;
-  --sidebar-overlay-gap: 16px; /* gap from topbar area if needed */
+  --sidebar-overlay-gap: 16px;
 }
 
 /* container */
@@ -23,7 +23,7 @@
   z-index: 1280;
 }
 
-/* base non-overlay sidebar (desktop docked) */
+/* base docked sidebar */
 .sidebar {
   width: var(--sidebar-w);
   max-width: var(--sidebar-w);
@@ -43,7 +43,7 @@
   z-index: 1290;
 }
 
-/* desktop offset under topbar for docked state */
+/* docked offset under topbar for desktop */
 @media (min-width: 992px) {
   .sidebar {
     top: var(--topbar-offset);
@@ -71,7 +71,7 @@
 .sidebar-link .icon { display:inline-block; width:28px; text-align:center; font-size:18px; position:relative; }
 .sidebar-link .label { font-size:14px; color:inherit; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition: opacity 120ms ease, transform 120ms ease; }
 
-/* tooltip (collapsed) */
+/* tooltip for collapsed */
 .sidebar.collapsed .sidebar-link .icon[data-tooltip]::after,
 .sidebar.collapsed .sidebar-link:focus-within .icon[data-tooltip]::after {
   content: attr(data-tooltip);
@@ -128,11 +128,10 @@
 .sidebar.collapsed .sidebar-header .brand .brand-title,
 .sidebar.collapsed .sidebar-header .brand .title { display:none; }
 
-/* overlay styles (used when sidebar is in overlay mode) */
-/* overlay container class: .sidebar-overlay-active on .sidebar-container */
+/* overlay styles: overlay-active class on container */
 .sidebar-container.sidebar-overlay-active .sidebar {
   position: fixed;
-  left: 16px; /* offset from left edge for nice visual */
+  left: 18px; /* slight shift right to align with topbar visual */
   transform: translateX(0);
   z-index: 1320;
   width: var(--sidebar-w);
@@ -141,30 +140,52 @@
   border-radius: var(--sidebar-overlay-radius);
   box-shadow: 0 18px 36px rgba(2,6,23,0.5);
   pointer-events: auto;
-  /* height will be set by inline style from JS to fit content up to max */
   overflow: hidden;
 }
 
-/* when overlay active, show overlay backdrop */
+/* overlay backdrop visible */
 .sidebar-container.sidebar-overlay-active .sidebar-overlay {
   opacity: 1;
   pointer-events: auto;
   z-index: 1300;
 }
 
-/* internal scroll region for overlay content */
-.sidebar-container.sidebar-overlay-active .sidebar .sidebar-list,
-.sidebar-container.sidebar-overlay-active .sidebar {
+/* internal scroll for overlay */
+.sidebar-container.sidebar-overlay-active .sidebar,
+.sidebar-container.sidebar-overlay-active .sidebar .sidebar-list {
   overflow-y: auto;
   padding-bottom: 12px;
 }
 
-/* limit overlay height via CSS variable (set by JS) with fallback */
+/* overlay max height set by JS via inline style or --sidebar-overlay-max-height */
 .sidebar-container.sidebar-overlay-active .sidebar {
   max-height: var(--sidebar-overlay-max-height, calc(100vh - (var(--topbar-offset) + 48px)));
+}
+
+/* ensure main-area is not shifted when overlay active (no layout change) */
+/* docked state continues to push main-area via media query below */
+
+/* layout adjustments when docked (not overlay) */
+@media (min-width: 992px) {
+  /* when sidebar is not overlay-active, main area gets left margin */
+  body:not(.sidebar-overlay-active) .main-area,
+  .main-area {
+    transition: margin-left var(--transition-medium) cubic-bezier(.2,.9,.2,1);
+  }
+  /* If sidebar is present and not overlay-active, main area margin-left equals sidebar width */
+  .sidebar:not(.collapsed) ~ .main-area, .sidebar:not(.collapsed) + .main-area {
+    margin-left: var(--sidebar-w);
+  }
+  .sidebar.collapsed ~ .main-area, .sidebar.collapsed + .main-area {
+    margin-left: var(--sidebar-collapsed-w);
+  }
 }
 
 /* small polishes */
 .sidebar-link:focus { outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset:2px; }
 .sidebar-list { padding-left: 0 !important; }
 .sidebar-header { padding-left: 8px !important; border-top-left-radius: var(--sidebar-overlay-radius); border-top-right-radius: var(--sidebar-overlay-radius); }
+
+/* content area tweak: reduce right padding so dashboard card has less space on right */
+.main-area { padding-right: 12px; }
+.view-root { padding-left: 20px; padding-right: 20px; }

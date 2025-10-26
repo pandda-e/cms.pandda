@@ -1,6 +1,7 @@
 // public/js/components/sidebar.js
-// Overlay-on-desktop behavior: overlay aligns to content top, rounded corners, height=contentHeight (capped).
-// When overlay active we set .sidebar-container.sidebar-overlay-active and inline CSS vars for top and max-height.
+// Overlay-on-desktop behavior with improved alignment and mobile fix.
+// Ensures overlay is placed slightly right, sized to content up to max, and backdrop click closes.
+// Fix mobile: overlay and click outside should close and not be under topbar.
 
 export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) {
   const container = document.getElementById(sidebarContainerId);
@@ -50,9 +51,8 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     container.appendChild(sidebar);
   }
 
-  // helpers
-  function isMobile() { return window.matchMedia('(max-width: 991px)').matches; }
   const COLLAPSED_KEY = 'pandda_sidebar_collapsed';
+  function isMobile() { return window.matchMedia('(max-width: 991px)').matches; }
 
   function applyCollapsed(collapsed) {
     if (collapsed) sidebar.classList.add('collapsed'); else sidebar.classList.remove('collapsed');
@@ -68,9 +68,12 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     container.classList.add('open');
     if (desktopOverlay) container.classList.add('sidebar-overlay-active');
     try { sessionStorage.setItem('pandda_sidebar_open', '1'); } catch(_) {}
+    // ensure backdrop starts below topbar by setting its top via inline style if needed
+    const topbarH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-height')) || 64;
+    overlay.style.top = `${topbarH}px`;
+    overlay.style.height = `calc(100vh - ${topbarH}px)`;
     document.documentElement.classList.add('no-scroll');
     document.body.style.overflow = 'hidden';
-    // If overlay-desktop, compute position/size
     if (desktopOverlay) applyDesktopOverlaySizing();
   }
 
@@ -80,13 +83,13 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     try { sessionStorage.removeItem('pandda_sidebar_open'); } catch(_) {}
     document.documentElement.classList.remove('no-scroll');
     document.body.style.overflow = '';
-    // remove inline sizing vars
-    try {
-      container.style.removeProperty('--sidebar-overlay-max-height');
-      container.style.removeProperty('--sidebar-overlay-top');
-      sidebar.style.removeProperty('top');
-      sidebar.style.removeProperty('max-height');
-    } catch(_) {}
+    overlay.style.top = '';
+    overlay.style.height = '';
+    // remove sidebar inline sizing
+    sidebar.style.top = '';
+    sidebar.style.maxHeight = '';
+    sidebar.style.left = '';
+    container.style.removeProperty('--sidebar-overlay-max-height');
   }
 
   function toggleSidebarMobile() {
@@ -97,20 +100,15 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   function toggleCollapsedDesktop() {
     const collapsedNow = sidebar.classList.toggle('collapsed');
     try { localStorage.setItem(COLLAPSED_KEY, collapsedNow ? '1' : '0'); } catch(_) {}
-    // If toggled from collapsed -> expanded, open overlay on desktop
+    // If toggled to expanded on desktop, open as overlay-desktop
     if (!isMobile()) {
-      if (!collapsedNow) {
-        // expanded: open overlay-desktop
-        openSidebarOverlay(true);
-      } else {
-        // collapsed: close overlay-desktop if present
-        closeSidebarOverlay();
-      }
+      if (!collapsedNow) openSidebarOverlay(true);
+      else closeSidebarOverlay();
     }
     updateTooltips();
   }
 
-  // item builder
+  // create menu item with tooltip text
   function makeItem(href, icon, text, attrs = {}) {
     const li = document.createElement('li');
     li.className = 'sidebar-item';
@@ -143,10 +141,7 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     a.addEventListener('click', (e) => {
       setActiveRoute(a.getAttribute('data-route') || href);
       if (isMobile()) closeSidebarOverlay();
-      else {
-        // if overlay-desktop was open, close it after navigation
-        if (container.classList.contains('sidebar-overlay-active')) closeSidebarOverlay();
-      }
+      else if (container.classList.contains('sidebar-overlay-active')) closeSidebarOverlay();
     });
 
     li.appendChild(a);
@@ -196,7 +191,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     setActiveRoute(getCurrentRoute());
   }
 
-  // active-route helpers
   function getCurrentRoute() {
     const h = location.hash || '';
     if (h.startsWith('#/')) return h.replace('#/','');
@@ -215,78 +209,70 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     }
   }
 
-  // overlay sizing helpers (desktop overlay)
+  // compute overlay sizing and position (desktop)
   function applyDesktopOverlaySizing() {
     try {
-      // find the top of the main content (#view-root) relative to viewport
       const viewRoot = document.querySelector('#view-root') || document.querySelector('main') || document.querySelector('.main-area');
-      const contentTop = viewRoot ? viewRoot.getBoundingClientRect().top + window.scrollY : (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-offset')) || 64);
-      const topbarHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-height')) || parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-offset')) || 64;
+      const viewRect = viewRoot ? viewRoot.getBoundingClientRect() : null;
+      const topbarH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-height')) || 64;
+      // desired top: align with the top of the first card or viewRoot top relative to viewport
+      let desiredTop = topbarH + 8; // fallback small gap under topbar
+      if (viewRect) desiredTop = Math.max(topbarH + 8, viewRect.top + window.scrollY);
 
-      // desired top (px) for the overlay sidebar: align with viewRoot top (under topbar)
-      const desiredTop = contentTop;
-      // measure height required by sidebar content
-      const list = sidebar.querySelector('.sidebar-list');
       const header = sidebar.querySelector('.sidebar-header');
+      const list = sidebar.querySelector('.sidebar-list');
       const headerH = header ? header.getBoundingClientRect().height : 0;
-      const listH = list ? Array.from(list.children).reduce((acc, li)=> acc + li.getBoundingClientRect().height, 0) : 0;
-      const contentHeight = Math.ceil(headerH + listH + 24); // padding bottom
+      // compute total list height (sum children)
+      const items = list ? Array.from(list.children) : [];
+      const listH = items.reduce((acc, el) => acc + el.getBoundingClientRect().height, 0);
+      const contentHeight = Math.ceil(headerH + listH + 20); // padding
 
-      // max height available: from desiredTop to bottom of viewport minus gap
-      const available = Math.max(120, window.innerHeight - desiredTop - 24);
+      const available = Math.max(120, window.innerHeight - (desiredTop + 24));
+      const finalH = Math.min(contentHeight, available);
 
-      const finalHeight = Math.min(contentHeight, available);
-
-      // set inline styles / CSS vars
-      container.style.setProperty('--sidebar-overlay-top', `${desiredTop}px`);
-      const maxH = Math.min(available, Math.max(finalHeight, 120));
-      container.style.setProperty('--sidebar-overlay-max-height', `${maxH}px`);
-
-      // apply to sidebar styles: position it at desiredTop (relative to viewport via top)
+      // set sidebar top relative to viewport (fixed)
       sidebar.style.top = `${desiredTop}px`;
-      sidebar.style.maxHeight = `${maxH}px`;
-      sidebar.style.left = `16px`;
+      sidebar.style.left = `18px`;
+      sidebar.style.maxHeight = `${finalH}px`;
 
-      // ensure overlay classes are set (done by caller)
+      // set CSS var for max height fallback
+      container.style.setProperty('--sidebar-overlay-max-height', `${finalH}px`);
     } catch (e) {
       console.warn('applyDesktopOverlaySizing failed', e);
     }
   }
 
-  // overlay handlers for mobile and desktop
+  // overlay click: close both mobile and desktop overlays when clicking backdrop
   overlay.addEventListener('click', () => {
-    if (isMobile()) closeSidebarOverlay();
-    else {
-      // if desktop overlay active, close it
-      if (container.classList.contains('sidebar-overlay-active')) closeSidebarOverlay();
-    }
+    if (container.classList.contains('sidebar-overlay-active') || isMobile()) closeSidebarOverlay();
   });
 
+  // click outside handler works for both mobile overlay and desktop overlay
   document.addEventListener('click', (e) => {
-    if (!container.classList.contains('sidebar-overlay-active') && !isMobile()) return;
+    if (!container.classList.contains('open')) return;
     if (!sidebar) return;
     if (sidebar.contains(e.target)) return;
     if (e.target.closest('[data-sidebar-toggle]')) return;
-    if (container.classList.contains('open')) closeSidebarOverlay();
+    closeSidebarOverlay();
   }, { capture: true });
 
+  // ESC closes overlay
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && container.classList.contains('open')) closeSidebarOverlay();
   });
 
-  // init collapsed state
+  // init collapsed state and resize handling
   try {
     const stored = readStoredCollapsed();
     if (!isMobile()) applyCollapsed(stored);
     window.addEventListener('resize', () => {
       if (isMobile()) applyCollapsed(false);
       else applyCollapsed(readStoredCollapsed());
-      // if overlay active, recompute sizing
       if (container.classList.contains('sidebar-overlay-active')) applyDesktopOverlaySizing();
     });
   } catch(_) {}
 
-  // expose global toggle used by topbar hamburger
+  // global toggle
   window.togglePanddaSidebar = function(source = 'topbar') {
     if (isMobile()) toggleSidebarMobile();
     else toggleCollapsedDesktop();
@@ -303,7 +289,7 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   window.addEventListener('hashchange', () => setActiveRoute(getCurrentRoute()));
   window.addEventListener('popstate', () => setActiveRoute(getCurrentRoute()));
 
-  // initial
+  // initial render
   buildList().catch(()=>{});
 
   const api = {
