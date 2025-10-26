@@ -1,14 +1,14 @@
 // public/js/components/sidebar.js
-// Responsive sidebar with desktop collapse/expand (icons-only).
-// - Removed sidebar-close-btn entirely
-// - Items mark themselves active on click and on navigation changes
-// - Exposes window.togglePanddaSidebar for topbar to call
-// - Idempotent setup via container.__sidebar_inited
+// Re-implementação com comportamento:
+// - collapsed permanent toggle (via localStorage)
+// - collapsed hover expand temporary (desktop)
+// - mobile overlay close on outside click / ESC
+// - active item management
+// - exposes window.togglePanddaSidebar()
 
 export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) {
   const container = document.getElementById(sidebarContainerId);
   if (!container) return null;
-
   if (container.__sidebar_inited) return container.__sidebar_api || null;
   container.__sidebar_inited = true;
 
@@ -29,7 +29,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     sidebar.setAttribute('role', 'navigation');
     sidebar.setAttribute('aria-label', 'Sidebar');
 
-    // header: brand only (no close/minimize buttons here)
     const header = document.createElement('div');
     header.className = 'sidebar-header';
     const brandWrap = document.createElement('div');
@@ -42,7 +41,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     title.className = 'brand-title';
     title.innerHTML = '<div style="font-weight:700">Pandda</div><div class="small">Painel</div>';
     brandWrap.appendChild(title);
-
     header.appendChild(brandWrap);
     sidebar.appendChild(header);
 
@@ -54,7 +52,44 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     container.appendChild(sidebar);
   }
 
-  // helper to create items (attrs must be plain object)
+  // helpers
+  function isMobile() { return window.matchMedia('(max-width: 991px)').matches; }
+  const COLLAPSED_KEY = 'pandda_sidebar_collapsed';
+
+  function applyCollapsed(collapsed) {
+    if (collapsed) sidebar.classList.add('collapsed'); else sidebar.classList.remove('collapsed');
+    try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0'); } catch(_) {}
+  }
+
+  function readStoredCollapsed() {
+    try { return localStorage.getItem(COLLAPSED_KEY) === '1'; } catch(_) { return false; }
+  }
+
+  function openSidebarOverlay() {
+    container.classList.add('open');
+    overlay.style.pointerEvents = 'auto';
+    document.documentElement.classList.add('no-scroll');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSidebarOverlay() {
+    container.classList.remove('open');
+    overlay.style.pointerEvents = 'none';
+    document.documentElement.classList.remove('no-scroll');
+    document.body.style.overflow = '';
+  }
+
+  // toggle behaviors
+  function toggleCollapsedDesktop() {
+    const collapsedNow = sidebar.classList.toggle('collapsed');
+    try { localStorage.setItem(COLLAPSED_KEY, collapsedNow ? '1' : '0'); } catch(_) {}
+  }
+
+  function toggleSidebarMobile() {
+    if (container.classList.contains('open')) closeSidebarOverlay(); else openSidebarOverlay();
+  }
+
+  // Build items
   function makeItem(href, icon, text, attrs = {}) {
     const li = document.createElement('li');
     li.className = 'sidebar-item';
@@ -78,24 +113,19 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
 
     if (attrs && typeof attrs === 'object' && !Array.isArray(attrs)) {
       for (const k in attrs) {
-        try { a.setAttribute(k, String(attrs[k])); } catch(_) { /* ignore invalid names */ }
+        try { a.setAttribute(k, String(attrs[k])); } catch(_) {}
       }
     }
 
-    // clicking an item marks it active and closes on mobile
     a.addEventListener('click', (e) => {
-      // allow normal anchor navigation; set active class
       setActiveRoute(a.getAttribute('data-route') || href);
-      if (isMobile()) {
-        closeSidebar();
-      }
+      if (isMobile()) closeSidebarOverlay();
     });
 
     li.appendChild(a);
     return li;
   }
 
-  // build list with admins conditional
   async function buildList() {
     const list = sidebar.querySelector('#sidebar-list');
     if (!list) return;
@@ -114,7 +144,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
       const sessionMod = await import('/js/auth/session.js');
       const isSuper = sessionMod?.getState ? sessionMod.getState().isSuper : false;
       if (isSuper) list.appendChild(makeItem('#/admins', '🛠️', 'Admins', { 'data-admin': '1' }));
-
       sessionMod.onChange && sessionMod.onChange((st) => {
         const nowSuper = !!st?.isSuper;
         const hasAdmin = !!list.querySelector('[data-admin="1"]');
@@ -124,98 +153,15 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
           if (el && el.parentNode) el.parentNode.removeChild(el);
         }
       });
-    } catch (_) {
-      // session module not available; skip admins link
-    }
+    } catch (_) {}
 
-    // after building, set active based on current hash/route
     setActiveRoute(getCurrentRoute());
   }
 
-  // collapsed state
-  const COLLAPSED_KEY = 'pandda_sidebar_collapsed';
-  function isMobile() { return window.matchMedia('(max-width: 991px)').matches; }
-
-  function applyCollapsed(collapsed) {
-    if (collapsed) sidebar.classList.add('collapsed');
-    else sidebar.classList.remove('collapsed');
-    try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0'); } catch(_) {}
-  }
-
-  function openSidebar() {
-    container.classList.add('open');
-    try { sessionStorage.setItem('pandda_sidebar_open', '1'); } catch(_) {}
-    document.documentElement.classList.add('no-scroll');
-  }
-
-  function closeSidebar() {
-    container.classList.remove('open');
-    try { sessionStorage.removeItem('pandda_sidebar_open'); } catch(_) {}
-    document.documentElement.classList.remove('no-scroll');
-  }
-
-  function toggleSidebarMobile() {
-    if (container.classList.contains('open')) closeSidebar();
-    else openSidebar();
-  }
-
-  function toggleCollapsedDesktop() {
-    const collapsed = sidebar.classList.toggle('collapsed');
-    try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0'); } catch(_) {}
-  }
-
-  // initialize collapsed according to saved state and viewport
-  try {
-    const stored = localStorage.getItem(COLLAPSED_KEY);
-    const collapsed = stored === '1';
-    if (!isMobile()) applyCollapsed(collapsed);
-    window.addEventListener('resize', () => {
-      if (isMobile()) applyCollapsed(false);
-      else applyCollapsed(localStorage.getItem(COLLAPSED_KEY) === '1');
-    });
-  } catch(_) {}
-
-  // overlay click closes on mobile
-  overlay.addEventListener('click', () => { if (isMobile()) closeSidebar(); });
-
-  // click outside to close on mobile (delegation)
-  document.addEventListener('click', (e) => {
-    if (!isMobile()) return;
-    if (!sidebar) return;
-    if (sidebar.contains(e.target)) return;
-    if (e.target.closest('[data-sidebar-toggle]')) return;
-    if (container.classList.contains('open')) closeSidebar();
-  }, { capture: true });
-
-  // ESC closes on mobile
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && container.classList.contains('open')) closeSidebar();
-  });
-
-  // restore open state on mobile
-  try {
-    if (sessionStorage.getItem('pandda_sidebar_open') === '1' && isMobile()) openSidebar();
-  } catch(_) {}
-
-  // expose global toggle used by topbar hamburger
-  window.togglePanddaSidebar = function() {
-    if (isMobile()) toggleSidebarMobile();
-    else toggleCollapsedDesktop();
-  };
-
-  // delegation from topbar (ensures clicks on elements with data-sidebar-toggle also work)
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-sidebar-toggle]');
-    if (!btn) return;
-    e.preventDefault();
-    if (isMobile()) toggleSidebarMobile();
-    else toggleCollapsedDesktop();
-  });
-
-  // Active-route helpers -------------------------------------------------
+  // Active-route helpers
   function getCurrentRoute() {
     const h = location.hash || '';
-    if (h.startsWith('#/')) return h.replace('#/', '');
+    if (h.startsWith('#/')) return h.replace('#/','');
     return location.pathname.replace(/^\//, '');
   }
 
@@ -231,16 +177,75 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     }
   }
 
-  // update active on hashchange/navigation
+  // Event handlers for mobile overlay clicks and ESC
+  overlay.addEventListener('click', () => { if (isMobile()) closeSidebarOverlay(); });
+
+  document.addEventListener('click', (e) => {
+    if (!isMobile()) return;
+    if (!sidebar) return;
+    if (sidebar.contains(e.target)) return;
+    if (e.target.closest('[data-sidebar-toggle]')) return;
+    if (container.classList.contains('open')) closeSidebarOverlay();
+  }, { capture: true });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && container.classList.contains('open')) closeSidebarOverlay();
+  });
+
+  // Hover expand: only on desktop, only temporary
+  let hoverTimeout = null;
+  sidebar.addEventListener('mouseenter', () => {
+    if (isMobile()) return;
+    if (sidebar.classList.contains('collapsed')) {
+      // temporary expand on hover
+      sidebar.classList.add('hover-expanding');
+      // small delay to avoid flicker
+      clearTimeout(hoverTimeout);
+      hoverTimeout = setTimeout(() => sidebar.classList.add('expanded-temp'), 40);
+    }
+  });
+  sidebar.addEventListener('mouseleave', () => {
+    if (isMobile()) return;
+    if (sidebar.classList.contains('collapsed')) {
+      clearTimeout(hoverTimeout);
+      sidebar.classList.remove('expanded-temp');
+      setTimeout(() => { sidebar.classList.remove('hover-expanding'); }, 160);
+    }
+  });
+
+  // maintain collapsed state across resizes
+  try {
+    const stored = readStoredCollapsed();
+    if (!isMobile()) applyCollapsed(stored);
+    window.addEventListener('resize', () => {
+      if (isMobile()) applyCollapsed(false);
+      else applyCollapsed(readStoredCollapsed());
+    });
+  } catch (_) {}
+
+  // expose global toggle used by topbar hamburger
+  window.togglePanddaSidebar = function() {
+    if (isMobile()) toggleSidebarMobile();
+    else toggleCollapsedDesktop();
+  };
+
+  // delegation from topbar (data-sidebar-toggle)
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-sidebar-toggle]');
+    if (!btn) return;
+    e.preventDefault();
+    if (isMobile()) toggleSidebarMobile(); else toggleCollapsedDesktop();
+  });
+
   window.addEventListener('hashchange', () => setActiveRoute(getCurrentRoute()));
   window.addEventListener('popstate', () => setActiveRoute(getCurrentRoute()));
 
-  // initial render
+  // initial
   buildList().catch(()=>{});
 
   const api = {
-    openSidebar,
-    closeSidebar,
+    openSidebar: openSidebarOverlay,
+    closeSidebar: closeSidebarOverlay,
     toggleSidebar: window.togglePanddaSidebar,
     rebuild: buildList
   };

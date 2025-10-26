@@ -1,9 +1,9 @@
 // public/js/components/topbar.js
-// Topbar with robust hamburger handler:
-// - guaranteed to call window.togglePanddaSidebar()
-// - lazy-inits sidebar module if needed
-// - idempotent listener attachment
-// - logs a debug message when hamburger is clicked (helpful for verification)
+// Topbar updated:
+// - hamburger calls window.togglePanddaSidebar()
+// - theme toggle uses /src/core/theme.js with fallback
+// - logout asks for confirmation before calling session.signOut / clearSession
+// - displays only user email (keeps updated)
 
 function createEl(tag, attrs = {}, children = []) {
   const el = document.createElement(tag);
@@ -48,15 +48,8 @@ function createTopbarStructure() {
 }
 
 export async function mountTopbar(containerSelector = '#topbar-container', opts = {}) {
-  const container = typeof containerSelector === 'string'
-    ? document.querySelector(containerSelector)
-    : containerSelector;
-
-  if (!container) {
-    console.warn('mountTopbar: container not found:', containerSelector);
-    return null;
-  }
-
+  const container = typeof containerSelector === 'string' ? document.querySelector(containerSelector) : containerSelector;
+  if (!container) { console.warn('mountTopbar: container not found:', containerSelector); return null; }
   if (container.__topbar_mounted) return container.__topbar_api || null;
   container.__topbar_mounted = true;
 
@@ -67,7 +60,7 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
 
   async function ensureSidebarAndToggle() {
     if (typeof window.togglePanddaSidebar === 'function') {
-      try { window.togglePanddaSidebar(); return true; } catch(e){ /* fallback */ }
+      try { window.togglePanddaSidebar(); return true; } catch(e) {}
     }
     try {
       const mod = await import('/js/components/sidebar.js').catch(err => { throw err; });
@@ -85,30 +78,23 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
   }
 
   function bindHandlers() {
-    // robust hamburger handler with idempotent attachment
     if (!hamburger.__pandda_hotfix_attached) {
       hamburger.__pandda_hotfix_attached = true;
       hamburger.addEventListener('click', async (e) => {
         e.preventDefault();
         try {
-          console.log('topbar: hamburger clicked'); // debug marker to confirm listener execution
+          console.log('topbar: hamburger clicked');
           const ok = await ensureSidebarAndToggle();
           if (!ok) console.warn('topbar: sidebar toggle did not run');
-        } catch (err) {
-          console.warn('topbar: error toggling sidebar', err);
-        }
+        } catch (err) { console.warn('topbar: error toggling sidebar', err); }
       }, { passive: false });
     }
 
-    // theme toggle fallback
     themeBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
         const theme = await import('/src/core/theme.js').catch(()=>null);
         if (theme && typeof theme.toggleTheme === 'function') { theme.toggleTheme(); return; }
-      } catch(_) {}
-      try {
-        if (typeof window.toggleTheme === 'function') { window.toggleTheme(); return; }
       } catch(_) {}
       try {
         const cur = document.documentElement.getAttribute('data-theme') || (document.body.classList.contains('theme-dark') ? 'dark' : 'light');
@@ -119,26 +105,20 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
       } catch (err) { console.warn('theme toggle failed', err); }
     });
 
-    // logout
     logoutBtn.addEventListener('click', async (e) => {
       e.preventDefault();
+      const ok = confirm('Deseja realmente sair?');
+      if (!ok) return;
       try {
         const sessionMod = await import('/js/auth/session.js');
-        if (sessionMod && typeof sessionMod.signOut === 'function') {
-          await sessionMod.signOut();
-          return;
-        }
-        if (sessionMod && typeof sessionMod.clearSession === 'function') {
-          await sessionMod.clearSession();
-          return;
-        }
+        if (sessionMod && typeof sessionMod.signOut === 'function') { await sessionMod.signOut(); return; }
+        if (sessionMod && typeof sessionMod.clearSession === 'function') { await sessionMod.clearSession(); return; }
       } catch (err) {
         console.warn('logout via session module failed', err);
       }
       try { location.replace('/login.html'); } catch(_) {}
     });
 
-    // populate user email and keep updated
     (async () => {
       try {
         const sessionMod = await import('/js/auth/session.js');
@@ -162,7 +142,6 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
       return mountTopbar(containerSelector, opts);
     }
   };
-
   container.__topbar_api = api;
   return api;
 }
