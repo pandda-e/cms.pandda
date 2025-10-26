@@ -1,9 +1,9 @@
-/* topbar.css — modern, fixed, improved contrast and elevation in light theme */
+/* topbar.css — visual unido para claro e escuro, com destaque e bordas arredondadas */
 :root{
   --topbar-h:64px;
   --glass: rgba(255,255,255,0.03);
   --accent: var(--accent, #6ee7b7);
-  --topbar-radius: 10px; /* ajuste se quiser cantos mais ou menos arredondados */
+  --topbar-radius: 10px;
   --topbar-elev: 0 8px 22px rgba(12,18,26,0.06);
 }
 
@@ -21,24 +21,29 @@
   left: 0;
   right: 0;
   top: 0;
-  z-index: 1300; /* garantir que topbar fique acima da sidebar em mobile */
+  z-index: 1400; /* garantir topbar acima de overlays */
   transition: background 180ms ease, box-shadow 180ms ease, border-radius 180ms ease;
 }
 
-/* Make topbar visually distinct in light theme */
-html[data-theme="light"] .topbar,
-body.theme-light .topbar {
-  background: linear-gradient(180deg, rgba(2,6,23,0.03), rgba(2,6,23,0.01));
+/* Make topbar visually distinct in light and dark themes (unified) */
+.topbar--elevated {
+  background: linear-gradient(180deg, rgba(2,6,23,0.04), rgba(2,6,23,0.01));
   border-bottom: 1px solid rgba(12,18,26,0.06);
   box-shadow: var(--topbar-elev);
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
 }
 
-/* Optional rounded topbar: only on wider screens where it makes sense */
+/* Apply same elevated look in dark theme as was on light */
+html[data-theme="dark"] .topbar,
+body.theme-dark .topbar {
+  /* use the same elevated variables to ensure parity */
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  box-shadow: var(--topbar-elev);
+}
+
+/* Optional rounded topbar on wide screens */
 @media (min-width: 992px) {
-  html[data-theme="light"] .topbar,
-  body.theme-light .topbar {
+  .topbar {
     border-radius: var(--topbar-radius);
     margin: 8px 16px 0 16px;
     left: 16px;
@@ -71,5 +76,5 @@ body.theme-light .topbar {
   #topbar-user-email { display:none; }
 }
 
-/* small polish for focus */
+/* focus polish */
 .topbar-hamburger:focus, .button:focus { outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset:2px; }

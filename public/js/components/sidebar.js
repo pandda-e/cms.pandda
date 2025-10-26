@@ -1,6 +1,6 @@
 // public/js/components/sidebar.js
-// Sidebar updated: removed hover expansion; shows accessible tooltips when collapsed.
-// Tooltips implemented via data-tooltip on the icon; tooltip visible only when sidebar has .collapsed.
+// Overlay-on-desktop behavior: overlay aligns to content top, rounded corners, height=contentHeight (capped).
+// When overlay active we set .sidebar-container.sidebar-overlay-active and inline CSS vars for top and max-height.
 
 export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) {
   const container = document.getElementById(sidebarContainerId);
@@ -57,7 +57,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   function applyCollapsed(collapsed) {
     if (collapsed) sidebar.classList.add('collapsed'); else sidebar.classList.remove('collapsed');
     try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0'); } catch(_) {}
-    // update data-tooltip visibility behavior: tooltip is handled by CSS, but we ensure icons have tooltip text
     updateTooltips();
   }
 
@@ -65,29 +64,49 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     try { return localStorage.getItem(COLLAPSED_KEY) === '1'; } catch(_) { return false; }
   }
 
-  function openSidebar() {
+  function openSidebarOverlay(desktopOverlay = false) {
     container.classList.add('open');
+    if (desktopOverlay) container.classList.add('sidebar-overlay-active');
     try { sessionStorage.setItem('pandda_sidebar_open', '1'); } catch(_) {}
     document.documentElement.classList.add('no-scroll');
     document.body.style.overflow = 'hidden';
+    // If overlay-desktop, compute position/size
+    if (desktopOverlay) applyDesktopOverlaySizing();
   }
 
-  function closeSidebar() {
+  function closeSidebarOverlay() {
     container.classList.remove('open');
+    container.classList.remove('sidebar-overlay-active');
     try { sessionStorage.removeItem('pandda_sidebar_open'); } catch(_) {}
     document.documentElement.classList.remove('no-scroll');
     document.body.style.overflow = '';
+    // remove inline sizing vars
+    try {
+      container.style.removeProperty('--sidebar-overlay-max-height');
+      container.style.removeProperty('--sidebar-overlay-top');
+      sidebar.style.removeProperty('top');
+      sidebar.style.removeProperty('max-height');
+    } catch(_) {}
   }
 
   function toggleSidebarMobile() {
-    if (container.classList.contains('open')) closeSidebar();
-    else openSidebar();
+    if (container.classList.contains('open')) closeSidebarOverlay();
+    else openSidebarOverlay(false);
   }
 
   function toggleCollapsedDesktop() {
     const collapsedNow = sidebar.classList.toggle('collapsed');
     try { localStorage.setItem(COLLAPSED_KEY, collapsedNow ? '1' : '0'); } catch(_) {}
-    // ensure tooltips updated
+    // If toggled from collapsed -> expanded, open overlay on desktop
+    if (!isMobile()) {
+      if (!collapsedNow) {
+        // expanded: open overlay-desktop
+        openSidebarOverlay(true);
+      } else {
+        // collapsed: close overlay-desktop if present
+        closeSidebarOverlay();
+      }
+    }
     updateTooltips();
   }
 
@@ -110,7 +129,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     labelEl.className = 'label';
     labelEl.textContent = text;
 
-    // add tooltip text on the icon; CSS shows it only when .collapsed is present
     iconEl.setAttribute('data-tooltip', text);
 
     a.appendChild(iconEl);
@@ -124,7 +142,11 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
 
     a.addEventListener('click', (e) => {
       setActiveRoute(a.getAttribute('data-route') || href);
-      if (isMobile()) closeSidebar();
+      if (isMobile()) closeSidebarOverlay();
+      else {
+        // if overlay-desktop was open, close it after navigation
+        if (container.classList.contains('sidebar-overlay-active')) closeSidebarOverlay();
+      }
     });
 
     li.appendChild(a);
@@ -132,7 +154,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   }
 
   function updateTooltips() {
-    // Ensure each icon has data-tooltip attribute (already added in makeItem)
     const icons = sidebar.querySelectorAll('.sidebar-link .icon');
     icons.forEach(ic => {
       const txt = ic.getAttribute('data-tooltip') || ic.nextElementSibling?.textContent || '';
@@ -194,22 +215,64 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     }
   }
 
-  // overlay handlers for mobile
-  overlay.addEventListener('click', () => { if (isMobile()) closeSidebar(); });
+  // overlay sizing helpers (desktop overlay)
+  function applyDesktopOverlaySizing() {
+    try {
+      // find the top of the main content (#view-root) relative to viewport
+      const viewRoot = document.querySelector('#view-root') || document.querySelector('main') || document.querySelector('.main-area');
+      const contentTop = viewRoot ? viewRoot.getBoundingClientRect().top + window.scrollY : (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-offset')) || 64);
+      const topbarHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-height')) || parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-offset')) || 64;
+
+      // desired top (px) for the overlay sidebar: align with viewRoot top (under topbar)
+      const desiredTop = contentTop;
+      // measure height required by sidebar content
+      const list = sidebar.querySelector('.sidebar-list');
+      const header = sidebar.querySelector('.sidebar-header');
+      const headerH = header ? header.getBoundingClientRect().height : 0;
+      const listH = list ? Array.from(list.children).reduce((acc, li)=> acc + li.getBoundingClientRect().height, 0) : 0;
+      const contentHeight = Math.ceil(headerH + listH + 24); // padding bottom
+
+      // max height available: from desiredTop to bottom of viewport minus gap
+      const available = Math.max(120, window.innerHeight - desiredTop - 24);
+
+      const finalHeight = Math.min(contentHeight, available);
+
+      // set inline styles / CSS vars
+      container.style.setProperty('--sidebar-overlay-top', `${desiredTop}px`);
+      const maxH = Math.min(available, Math.max(finalHeight, 120));
+      container.style.setProperty('--sidebar-overlay-max-height', `${maxH}px`);
+
+      // apply to sidebar styles: position it at desiredTop (relative to viewport via top)
+      sidebar.style.top = `${desiredTop}px`;
+      sidebar.style.maxHeight = `${maxH}px`;
+      sidebar.style.left = `16px`;
+
+      // ensure overlay classes are set (done by caller)
+    } catch (e) {
+      console.warn('applyDesktopOverlaySizing failed', e);
+    }
+  }
+
+  // overlay handlers for mobile and desktop
+  overlay.addEventListener('click', () => {
+    if (isMobile()) closeSidebarOverlay();
+    else {
+      // if desktop overlay active, close it
+      if (container.classList.contains('sidebar-overlay-active')) closeSidebarOverlay();
+    }
+  });
 
   document.addEventListener('click', (e) => {
-    if (!isMobile()) return;
+    if (!container.classList.contains('sidebar-overlay-active') && !isMobile()) return;
     if (!sidebar) return;
     if (sidebar.contains(e.target)) return;
     if (e.target.closest('[data-sidebar-toggle]')) return;
-    if (container.classList.contains('open')) closeSidebar();
+    if (container.classList.contains('open')) closeSidebarOverlay();
   }, { capture: true });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && container.classList.contains('open')) closeSidebar();
+    if (e.key === 'Escape' && container.classList.contains('open')) closeSidebarOverlay();
   });
-
-  // -- REMOVED: hover-expand temporary behavior (no mouseenter/mouseleave handlers) --
 
   // init collapsed state
   try {
@@ -218,6 +281,8 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     window.addEventListener('resize', () => {
       if (isMobile()) applyCollapsed(false);
       else applyCollapsed(readStoredCollapsed());
+      // if overlay active, recompute sizing
+      if (container.classList.contains('sidebar-overlay-active')) applyDesktopOverlaySizing();
     });
   } catch(_) {}
 
@@ -242,8 +307,8 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   buildList().catch(()=>{});
 
   const api = {
-    openSidebar,
-    closeSidebar,
+    openSidebar: openSidebarOverlay,
+    closeSidebar: closeSidebarOverlay,
     toggleSidebar: window.togglePanddaSidebar,
     rebuild: buildList
   };

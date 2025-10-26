@@ -7,10 +7,12 @@
   --transition-fast: 150ms;
   --transition-medium: 220ms;
   --topbar-offset: var(--topbar-height, 64px);
+  --sidebar-overlay-radius: 12px;
+  --sidebar-overlay-gap: 16px; /* gap from topbar area if needed */
 }
 
 /* container */
-.sidebar-container { position: fixed; inset: 0; pointer-events: none; z-index: 1000; }
+.sidebar-container { position: fixed; inset: 0; pointer-events: none; z-index: 1300; }
 .sidebar-overlay {
   position: fixed;
   inset: 0;
@@ -18,9 +20,10 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 160ms ease;
+  z-index: 1280;
 }
 
-/* base */
+/* base non-overlay sidebar (desktop docked) */
 .sidebar {
   width: var(--sidebar-w);
   max-width: var(--sidebar-w);
@@ -37,10 +40,10 @@
   flex-direction: column;
   overflow-y: auto;
   transition: width var(--transition-medium) cubic-bezier(.2,.9,.2,1), transform var(--transition-fast) ease;
-  z-index: 1100;
+  z-index: 1290;
 }
 
-/* desktop offset under topbar */
+/* desktop offset under topbar for docked state */
 @media (min-width: 992px) {
   .sidebar {
     top: var(--topbar-offset);
@@ -50,7 +53,7 @@
 }
 
 /* header */
-.sidebar-header { display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid rgba(255,255,255,0.03); }
+.sidebar-header { display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid rgba(255,255,255,0.03); border-top-left-radius: var(--sidebar-overlay-radius); border-top-right-radius: var(--sidebar-overlay-radius); }
 .sidebar-header .brand { display:flex; gap:10px; align-items:center; font-weight:600; }
 .sidebar-header .logo { width:36px; height:36px; border-radius:8px; background:var(--glass); }
 
@@ -68,7 +71,7 @@
 .sidebar-link .icon { display:inline-block; width:28px; text-align:center; font-size:18px; position:relative; }
 .sidebar-link .label { font-size:14px; color:inherit; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition: opacity 120ms ease, transform 120ms ease; }
 
-/* tooltip (appears only when sidebar is collapsed) */
+/* tooltip (collapsed) */
 .sidebar.collapsed .sidebar-link .icon[data-tooltip]::after,
 .sidebar.collapsed .sidebar-link:focus-within .icon[data-tooltip]::after {
   content: attr(data-tooltip);
@@ -88,15 +91,11 @@
   pointer-events: none;
   transition: opacity 120ms ease, transform 120ms ease;
 }
-
-/* tooltip visible on hover/focus */
 .sidebar.collapsed .sidebar-link .icon[data-tooltip]:hover::after,
 .sidebar.collapsed .sidebar-link:focus-within .icon[data-tooltip]::after {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
 }
-
-/* small arrow */
 .sidebar.collapsed .sidebar-link .icon[data-tooltip]::before {
   content: "";
   position: absolute;
@@ -110,9 +109,7 @@
   transition: opacity 120ms ease;
 }
 .sidebar.collapsed .sidebar-link .icon[data-tooltip]:hover::before,
-.sidebar.collapsed .sidebar-link:focus-within .icon[data-tooltip]::before {
-  opacity: 1;
-}
+.sidebar.collapsed .sidebar-link:focus-within .icon[data-tooltip]::before { opacity: 1; }
 
 /* active */
 .sidebar-link.active { background: linear-gradient(90deg, rgba(255,255,255,0.02), transparent); position:relative; }
@@ -131,54 +128,43 @@
 .sidebar.collapsed .sidebar-header .brand .brand-title,
 .sidebar.collapsed .sidebar-header .brand .title { display:none; }
 
-/* collapsed active indicator becomes a dot */
-.sidebar.collapsed .sidebar-link.active::before {
-  left: 50%; transform: translateX(-50%); top:auto; bottom:10px; width:8px; height:8px; border-radius:50%;
+/* overlay styles (used when sidebar is in overlay mode) */
+/* overlay container class: .sidebar-overlay-active on .sidebar-container */
+.sidebar-container.sidebar-overlay-active .sidebar {
+  position: fixed;
+  left: 16px; /* offset from left edge for nice visual */
+  transform: translateX(0);
+  z-index: 1320;
+  width: var(--sidebar-w);
+  max-width: calc(100vw - 48px);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--sidebar-bg);
+  border-radius: var(--sidebar-overlay-radius);
+  box-shadow: 0 18px 36px rgba(2,6,23,0.5);
+  pointer-events: auto;
+  /* height will be set by inline style from JS to fit content up to max */
+  overflow: hidden;
 }
 
-/* layout adjustments when sidebar present */
-@media (min-width: 992px) {
-  body .main-area { transition: margin-left var(--transition-medium) cubic-bezier(.2,.9,.2,1); margin-left: var(--sidebar-w); }
-  .sidebar.collapsed ~ .main-area, .sidebar.collapsed + .main-area { margin-left: var(--sidebar-collapsed-w); }
-  .sidebar:not(.collapsed) ~ .main-area, .sidebar:not(.collapsed) + .main-area { margin-left: var(--sidebar-w); }
+/* when overlay active, show overlay backdrop */
+.sidebar-container.sidebar-overlay-active .sidebar-overlay {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1300;
 }
 
-/* mobile: overlay behavior (keeps below topbar) */
-@media (max-width: 991px) {
-  .sidebar {
-    transform: translateX(-100%);
-    position: fixed;
-    left: 0;
-    top: var(--topbar-offset);
-    height: calc(100vh - var(--topbar-offset));
-    width: var(--sidebar-w);
-    max-width: 80vw;
-    z-index: 1100;
-  }
-
-  .sidebar.collapsed { width: var(--sidebar-w); }
-
-  .sidebar-container.open .sidebar { transform: translateX(0); }
-
-  .sidebar-container.open .sidebar-overlay {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .sidebar-overlay {
-    display: block;
-    opacity: 0;
-    transition: opacity 180ms ease;
-    position: fixed;
-    inset: 0;
-    top: var(--topbar-offset);
-    height: calc(100vh - var(--topbar-offset));
-    background: rgba(0, 0, 0, 0.45);
-    z-index: 1000;
-  }
+/* internal scroll region for overlay content */
+.sidebar-container.sidebar-overlay-active .sidebar .sidebar-list,
+.sidebar-container.sidebar-overlay-active .sidebar {
+  overflow-y: auto;
+  padding-bottom: 12px;
 }
 
-/* focus and polish */
+/* limit overlay height via CSS variable (set by JS) with fallback */
+.sidebar-container.sidebar-overlay-active .sidebar {
+  max-height: var(--sidebar-overlay-max-height, calc(100vh - (var(--topbar-offset) + 48px)));
+}
+
+/* small polishes */
 .sidebar-link:focus { outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset:2px; }
 .sidebar-list { padding-left: 0 !important; }
-.sidebar-header { padding-left: 8px !important; }
+.sidebar-header { padding-left: 8px !important; border-top-left-radius: var(--sidebar-overlay-radius); border-top-right-radius: var(--sidebar-overlay-radius); }
