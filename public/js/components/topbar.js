@@ -1,9 +1,5 @@
 // public/js/components/topbar.js
-// Topbar updated:
-// - hamburger calls window.togglePanddaSidebar()
-// - theme toggle uses /src/core/theme.js with fallback
-// - logout asks for confirmation before calling session.signOut / clearSession
-// - displays only user email (keeps updated)
+// Topbar with accessibility fixes: ensure container is not aria-hidden when interactive content is mounted.
 
 function createEl(tag, attrs = {}, children = []) {
   const el = document.createElement(tag);
@@ -48,8 +44,18 @@ function createTopbarStructure() {
 }
 
 export async function mountTopbar(containerSelector = '#topbar-container', opts = {}) {
-  const container = typeof containerSelector === 'string' ? document.querySelector(containerSelector) : containerSelector;
-  if (!container) { console.warn('mountTopbar: container not found:', containerSelector); return null; }
+  const container = typeof containerSelector === 'string'
+    ? document.querySelector(containerSelector)
+    : containerSelector;
+
+  if (!container) {
+    console.warn('mountTopbar: container not found:', containerSelector);
+    return null;
+  }
+
+  // Accessibility fix: ensure container is not aria-hidden when we mount interactive content
+  try { container.removeAttribute('aria-hidden'); } catch(_) {}
+
   if (container.__topbar_mounted) return container.__topbar_api || null;
   container.__topbar_mounted = true;
 
@@ -60,7 +66,7 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
 
   async function ensureSidebarAndToggle() {
     if (typeof window.togglePanddaSidebar === 'function') {
-      try { window.togglePanddaSidebar(); return true; } catch(e) {}
+      try { window.togglePanddaSidebar(); return true; } catch(e){ /* fallback */ }
     }
     try {
       const mod = await import('/js/components/sidebar.js').catch(err => { throw err; });
@@ -78,6 +84,7 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
   }
 
   function bindHandlers() {
+    // robust hamburger handler with idempotent attachment
     if (!hamburger.__pandda_hotfix_attached) {
       hamburger.__pandda_hotfix_attached = true;
       hamburger.addEventListener('click', async (e) => {
@@ -86,10 +93,13 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
           console.log('topbar: hamburger clicked');
           const ok = await ensureSidebarAndToggle();
           if (!ok) console.warn('topbar: sidebar toggle did not run');
-        } catch (err) { console.warn('topbar: error toggling sidebar', err); }
+        } catch (err) {
+          console.warn('topbar: error toggling sidebar', err);
+        }
       }, { passive: false });
     }
 
+    // theme toggle
     themeBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
@@ -105,20 +115,28 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
       } catch (err) { console.warn('theme toggle failed', err); }
     });
 
+    // logout with confirmation
     logoutBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       const ok = confirm('Deseja realmente sair?');
       if (!ok) return;
       try {
         const sessionMod = await import('/js/auth/session.js');
-        if (sessionMod && typeof sessionMod.signOut === 'function') { await sessionMod.signOut(); return; }
-        if (sessionMod && typeof sessionMod.clearSession === 'function') { await sessionMod.clearSession(); return; }
+        if (sessionMod && typeof sessionMod.signOut === 'function') {
+          await sessionMod.signOut();
+          return;
+        }
+        if (sessionMod && typeof sessionMod.clearSession === 'function') {
+          await sessionMod.clearSession();
+          return;
+        }
       } catch (err) {
         console.warn('logout via session module failed', err);
       }
       try { location.replace('/login.html'); } catch(_) {}
     });
 
+    // populate user email and keep updated
     (async () => {
       try {
         const sessionMod = await import('/js/auth/session.js');
@@ -142,6 +160,7 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
       return mountTopbar(containerSelector, opts);
     }
   };
+
   container.__topbar_api = api;
   return api;
 }
