@@ -19,7 +19,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 180ms ease;
-  z-index: 1380;
+  z-index: calc(var(--sidebar-overlay-z) - 10);
 }
 
 /* base docked sidebar */
@@ -39,7 +39,7 @@
   flex-direction:column;
   overflow-y:auto;
   transition: width var(--transition-medium) cubic-bezier(.2,.9,.2,1), transform var(--transition-fast) ease, box-shadow var(--transition-fast);
-  z-index: 1390;
+  z-index: var(--sidebar-z);
 }
 
 /* docked offset under topbar for desktop */
@@ -109,12 +109,13 @@
 .sidebar.collapsed .label { display:none !important; visibility:hidden !important; width:0; padding:0; margin:0; font-size:0; line-height:0; opacity:0; transform: translateX(-6px); transition: none; }
 .sidebar.collapsed .icon { width:40px; font-size:18px; text-align:center; }
 
-/* overlay styles: overlay-active class on container */
+/* overlay styles: overlay-active class on container (overlay should sit above topbar) */
 .sidebar-container.sidebar-overlay-active .sidebar {
+  z-index: var(--sidebar-overlay-z);
   position: fixed;
   left: 18px;
+  top: calc(var(--topbar-height) + 8px);
   transform: translateX(0);
-  z-index: 1420;
   width: var(--sidebar-w);
   max-width: calc(100vw - 48px);
   background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--sidebar-bg);
@@ -128,7 +129,7 @@
 .sidebar-container.sidebar-overlay-active .sidebar-overlay {
   opacity: 1;
   pointer-events: auto;
-  z-index: 1410;
+  z-index: calc(var(--sidebar-overlay-z) - 10);
 }
 
 /* internal scroll for overlay */
@@ -167,6 +168,13 @@
     height: calc(100vh - var(--topbar-offset));
     transform: translateX(0);
   }
+}
+
+/* Mobile safety: keep main-area free of left margin */
+@media (max-width: 991px) {
+  .main-area { margin-left: 0 !important; padding-left: 12px; padding-right: 12px; }
+  .sidebar { top: var(--topbar-height); height: calc(100vh - var(--topbar-height)); }
+  .sidebar-container { z-index: calc(var(--sidebar-overlay-z) - 20); }
 }
 
 .sidebar-link:focus { outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset:2px; }

@@ -6,6 +6,9 @@
 /* Core variables (defaults dark) */
 :root{
   --topbar-height: 64px;
+  --topbar-z: 1600;
+  --sidebar-z: 1650;
+  --sidebar-overlay-z: 1700;
 
   --bg: #0f1720;
   --card: #0b1220;
@@ -69,7 +72,7 @@ body {
   left: 0;
   right: 0;
   top: 0;
-  z-index: 1600;
+  z-index: var(--topbar-z);
   transition: background 180ms ease, box-shadow 180ms ease, transform 160ms ease;
 }
 
@@ -93,6 +96,7 @@ body {
   background: var(--sidebar-bg);
   color: var(--sidebar-foreground);
   border-right: 1px solid rgba(0,0,0,0.06);
+  z-index: var(--sidebar-z);
 }
 
 /* Light theme hover contrast fixes */
@@ -100,8 +104,8 @@ html[data-theme="light"] .sidebar .sidebar-list .sidebar-link:hover {
   background: rgba(2,6,23,0.03);
 }
 
-/* Ensure collapsed hover uses correct z-index so topbar remains above overlay */
-.sidebar.collapsed:hover { box-shadow: 6px 0 30px rgba(0,0,0,0.32); z-index: 1200; }
+/* Ensure collapsed hover uses correct z-index so topbar remains above overlay when needed */
+.sidebar.collapsed:hover { box-shadow: 6px 0 30px rgba(0,0,0,0.32); z-index: var(--sidebar-z); }
 
 /* Accent text */
 .sidebar .sidebar-list .label { color: var(--sidebar-foreground); }

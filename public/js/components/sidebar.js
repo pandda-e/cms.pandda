@@ -65,7 +65,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     }
     try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0'); } catch(_) {}
     updateTooltips();
-    // also update main-area fallback marker (in case CSS expects it)
     const main = document.querySelector('.main-area');
     if (main) {
       if (collapsed) main.classList.add('collapsed-fallback'); else main.classList.remove('collapsed-fallback');
@@ -80,9 +79,16 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     container.classList.add('open');
     if (desktopOverlay) container.classList.add('sidebar-overlay-active');
     try { sessionStorage.setItem('pandda_sidebar_open', '1'); } catch(_) {}
+
     const topbarH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-height')) || 64;
     overlay.style.top = `${topbarH}px`;
     overlay.style.height = `calc(100vh - ${topbarH}px)`;
+
+    // ensure overlay panel appears below topbar visually (small gap)
+    const gap = 8;
+    sidebar.style.top = `${topbarH + gap}px`;
+    sidebar.style.left = `18px`;
+
     document.documentElement.classList.add('no-scroll');
     document.body.style.overflow = 'hidden';
     if (desktopOverlay) applyDesktopOverlaySizing();
@@ -125,7 +131,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     }
 
     // Keep sidebar docked: do not open overlay when expanding on desktop
-    // on expand (collapsedNow === false) we want docked expanded state (handled by applyCollapsed(false))
     updateTooltips();
   }
 
@@ -276,7 +281,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
 
   try {
     const stored = readStoredCollapsed();
-    // apply stored collapsed only when not mobile
     if (!isMobile()) applyCollapsed(stored);
     window.addEventListener('resize', () => {
       if (isMobile()) applyCollapsed(false);
