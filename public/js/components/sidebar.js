@@ -1,4 +1,9 @@
 // public/js/components/sidebar.js
+// Overlay-on-desktop behavior with improved alignment and mobile fix.
+// Ensures overlay is placed slightly right, sized to content up to max, and backdrop click closes.
+// Desktop: toggle will dock/undock the sidebar and update the layout by toggling a 'collapsed' marker
+// on the sidebar-container so CSS can push the main-area correctly.
+
 export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) {
   const container = document.getElementById(sidebarContainerId);
   if (!container) return null;
@@ -51,9 +56,20 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   function isMobile() { return window.matchMedia('(max-width: 991px)').matches; }
 
   function applyCollapsed(collapsed) {
-    if (collapsed) sidebar.classList.add('collapsed'); else sidebar.classList.remove('collapsed');
+    if (collapsed) {
+      sidebar.classList.add('collapsed');
+      container.classList.add('collapsed');
+    } else {
+      sidebar.classList.remove('collapsed');
+      container.classList.remove('collapsed');
+    }
     try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0'); } catch(_) {}
     updateTooltips();
+    // also update main-area fallback marker (in case CSS expects it)
+    const main = document.querySelector('.main-area');
+    if (main) {
+      if (collapsed) main.classList.add('collapsed-fallback'); else main.classList.remove('collapsed-fallback');
+    }
   }
 
   function readStoredCollapsed() {
@@ -70,7 +86,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     document.documentElement.classList.add('no-scroll');
     document.body.style.overflow = 'hidden';
     if (desktopOverlay) applyDesktopOverlaySizing();
-    // animate in
     requestAnimationFrame(()=> sidebar.style.transform = 'translateX(0)');
   }
 
@@ -94,15 +109,27 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   }
 
   function toggleCollapsedDesktop() {
-    const collapsedNow = sidebar.classList.toggle('collapsed');
-    try { localStorage.setItem(COLLAPSED_KEY, collapsedNow ? '1' : '0'); } catch(_) {}
-    if (!isMobile()) {
-      if (!collapsedNow) openSidebarOverlay(true);
-      else closeSidebarOverlay();
+    // Toggle collapsed state on both sidebar and container so CSS sibling selectors can react
+    const collapsedNow = !sidebar.classList.contains('collapsed');
+    applyCollapsed(collapsedNow);
+
+    // Ensure overlay mode is disabled when docking
+    if (container.classList.contains('sidebar-overlay-active')) {
+      container.classList.remove('sidebar-overlay-active');
+      overlay.style.top = '';
+      overlay.style.height = '';
+      sidebar.style.top = '';
+      sidebar.style.left = '';
+      sidebar.style.maxHeight = '';
+      container.style.removeProperty('--sidebar-overlay-max-height');
     }
+
+    // Keep sidebar docked: do not open overlay when expanding on desktop
+    // on expand (collapsedNow === false) we want docked expanded state (handled by applyCollapsed(false))
     updateTooltips();
   }
 
+  // create menu item with tooltip text
   function makeItem(href, icon, text, attrs = {}) {
     const li = document.createElement('li');
     li.className = 'sidebar-item';
@@ -249,6 +276,7 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
 
   try {
     const stored = readStoredCollapsed();
+    // apply stored collapsed only when not mobile
     if (!isMobile()) applyCollapsed(stored);
     window.addEventListener('resize', () => {
       if (isMobile()) applyCollapsed(false);
