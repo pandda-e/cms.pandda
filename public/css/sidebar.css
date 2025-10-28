@@ -8,10 +8,14 @@
   --transition-medium: 260ms;
   --topbar-offset: var(--topbar-height, 64px);
   --sidebar-overlay-radius: 14px;
+  --sidebar-z: 1650;
+  --sidebar-overlay-z: 1700;
 }
 
-/* container */
+/* container (pointer-events disabled by default until open) */
 .sidebar-container { position: fixed; inset: 0; pointer-events: none; z-index: 1400; }
+
+/* backdrop (inert by default; becomes interactive when .open or overlay-active) */
 .sidebar-overlay {
   position: fixed;
   inset: 0;
@@ -20,6 +24,13 @@
   pointer-events: none;
   transition: opacity 180ms ease;
   z-index: calc(var(--sidebar-overlay-z) - 10);
+}
+
+/* when container is open, make backdrop visible and clickable */
+.sidebar-container.open .sidebar-overlay,
+.sidebar-container.sidebar-overlay-active .sidebar-overlay {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* base docked sidebar */
@@ -48,6 +59,21 @@
     top: var(--topbar-offset);
     height: calc(100vh - var(--topbar-offset));
     transform: translateX(0);
+    left: 0;
+  }
+
+  /* main-area transitions and push rules for docked sidebar */
+  .main-area {
+    transition: margin-left var(--transition-medium) cubic-bezier(.2,.9,.2,1);
+  }
+  .sidebar-container:not(.sidebar-overlay-active):not(.collapsed) + .main-area {
+    margin-left: var(--sidebar-w);
+  }
+  .sidebar-container:not(.sidebar-overlay-active).collapsed + .main-area {
+    margin-left: var(--sidebar-collapsed-w);
+  }
+  .sidebar-container:not(.sidebar-overlay-active) + .main-area.collapsed-fallback {
+    margin-left: var(--sidebar-collapsed-w);
   }
 }
 
@@ -139,42 +165,12 @@
   padding-bottom: 12px;
 }
 
-/* layout adjustments when docked (not overlay) */
-@media (min-width: 992px) {
-  .main-area {
-    transition: margin-left var(--transition-medium) cubic-bezier(.2,.9,.2,1);
-  }
-
-  /* If sidebar container is docked (not overlay-active) and NOT collapsed, push main area */
-  .sidebar-container:not(.sidebar-overlay-active):not(.collapsed) + .main-area {
-    margin-left: var(--sidebar-w);
-  }
-
-  /* When container indicates collapsed state, push main area by collapsed width */
-  .sidebar-container:not(.sidebar-overlay-active).collapsed + .main-area {
-    margin-left: var(--sidebar-collapsed-w);
-  }
-
-  /* Fallback if scripts set collapsed only on the sidebar element itself */
-  .sidebar-container:not(.sidebar-overlay-active) + .main-area.collapsed-fallback {
-    margin-left: var(--sidebar-collapsed-w);
-  }
-
-  /* ensure sidebar inside container remains fixed and aligned under topbar */
-  .sidebar-container .sidebar {
-    position: fixed;
-    left: 0;
-    top: var(--topbar-offset);
-    height: calc(100vh - var(--topbar-offset));
-    transform: translateX(0);
-  }
-}
-
 /* Mobile safety: keep main-area free of left margin */
 @media (max-width: 991px) {
   .main-area { margin-left: 0 !important; padding-left: 12px; padding-right: 12px; }
-  .sidebar { top: var(--topbar-height); height: calc(100vh - var(--topbar-height)); }
-  .sidebar-container { z-index: calc(var(--sidebar-overlay-z) - 20); }
+  .sidebar { top: var(--topbar-height); height: calc(100vh - var(--topbar-height)); left: 0; }
+  .sidebar-container { z-index: calc(var(--sidebar-overlay-z) - 20); pointer-events: none; }
+  .sidebar-container.open { pointer-events: auto; } /* make interactive when open */
 }
 
 .sidebar-link:focus { outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset:2px; }
