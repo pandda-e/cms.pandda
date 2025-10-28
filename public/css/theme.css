@@ -1,10 +1,10 @@
 /* public/css/theme.css
-   Theme variables and topbar/layout glue.
-   Includes --topbar-height and ensures topbar fills horizontal width.
+   Theme variables and layout glue.
+   Suporta toggle via src/core/theme.js que atualiza html[data-theme] e classes body.theme-*
 */
 
-/* Core variables (dark defaults) */
-:root {
+/* Core variables (defaults dark) */
+:root{
   --topbar-height: 64px;
 
   --bg: #0f1720;
@@ -15,8 +15,8 @@
   --accent-2: #7dd3fc;
   --surface: #0b1220;
   --glass: rgba(255,255,255,0.03);
-  --radius: 10px;
-  --shadow: 0 8px 26px rgba(2,6,23,0.6);
+  --radius: 12px;
+  --shadow: 0 10px 30px rgba(2,6,23,0.6);
 
   --sidebar-bg: #0b1220;
   --sidebar-foreground: #e6eef8;
@@ -32,27 +32,30 @@ html[data-theme="light"], body.theme-light {
   --accent-2: #6ee7b7;
   --surface: #ffffff;
   --glass: rgba(2,6,23,0.03);
-  --shadow: 0 8px 30px rgba(12,18,26,0.06);
+  --shadow: 0 10px 34px rgba(12,18,26,0.06);
 
   --sidebar-bg: #ffffff;
   --sidebar-foreground: #071026;
 }
 
-/* Dark theme explicit */
+/* Dark explicit (ensure predictable values) */
 html[data-theme="dark"], body.theme-dark {
   --sidebar-bg: #0b1220;
   --sidebar-foreground: #e6eef8;
 }
 
-/* Body and content */
+/* Global body and background */
 body {
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--bg);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.02), transparent),
+    var(--bg);
   color: var(--text);
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
+  transition: background 220ms ease, color 180ms ease;
 }
 
-/* Topbar fixed and full width (pushes content below via .main-area margin-top) */
+/* Topbar styling and placement */
 .topbar {
   height: var(--topbar-height);
   display:flex;
@@ -62,40 +65,56 @@ body {
   background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
   border-bottom: 1px solid rgba(255,255,255,0.03);
   backdrop-filter: blur(6px);
-
   position: fixed;
   left: 0;
   right: 0;
   top: 0;
-  z-index: 1200;
+  z-index: 1600;
+  transition: background 180ms ease, box-shadow 180ms ease, transform 160ms ease;
 }
 
-/* Ensure children inherit colors */
+/* elevated state for topbar (applied by JS if needed) */
+.topbar--elevated {
+  box-shadow: 0 10px 30px rgba(12,18,26,0.08);
+  border-bottom: 1px solid rgba(12,18,26,0.06);
+}
+
+/* ensure text inherits theme */
 .topbar, .topbar * { color: var(--text); }
 
-/* Main area moved below topbar */
+/* Push main content below topbar */
 .main-area {
   margin-top: var(--topbar-height);
-  transition: margin-left 220ms cubic-bezier(.2,.9,.2,1);
+  transition: margin-left 260ms cubic-bezier(.2,.9,.2,1), margin-top 160ms ease;
 }
 
-/* Sidebar theme glue */
+/* Sidebar glue: allow theme to control sidebar look */
 .sidebar {
   background: var(--sidebar-bg);
   color: var(--sidebar-foreground);
   border-right: 1px solid rgba(0,0,0,0.06);
 }
-.sidebar .sidebar-header { background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent); border-bottom: 1px solid rgba(255,255,255,0.03); }
-.sidebar .sidebar-list .sidebar-link { color: inherit; }
 
-/* Light-theme hover contrast */
+/* Light theme hover contrast fixes */
 html[data-theme="light"] .sidebar .sidebar-list .sidebar-link:hover {
   background: rgba(2,6,23,0.03);
 }
 
-/* Ensure collapsed hover uses correct z-index so topbar remains on top */
+/* Ensure collapsed hover uses correct z-index so topbar remains above overlay */
 .sidebar.collapsed:hover { box-shadow: 6px 0 30px rgba(0,0,0,0.32); z-index: 1200; }
 
-/* Accent and small polish */
+/* Accent text */
 .sidebar .sidebar-list .label { color: var(--sidebar-foreground); }
 .sidebar .sidebar-list .icon { color: var(--sidebar-foreground); }
+
+/* Small polish for forms and cards to react to theme changes */
+.card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.015), transparent), var(--card);
+  color: var(--text);
+  transition: background 180ms ease, color 160ms ease, box-shadow 180ms ease;
+}
+
+/* Theme change event indicator (used by JS optionally) */
+[data-theme-changing] {
+  transition: none !important;
+}

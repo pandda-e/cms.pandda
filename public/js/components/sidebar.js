@@ -1,8 +1,4 @@
 // public/js/components/sidebar.js
-// Overlay-on-desktop behavior with improved alignment and mobile fix.
-// Ensures overlay is placed slightly right, sized to content up to max, and backdrop click closes.
-// Fix mobile: overlay and click outside should close and not be under topbar.
-
 export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) {
   const container = document.getElementById(sidebarContainerId);
   if (!container) return null;
@@ -68,13 +64,14 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     container.classList.add('open');
     if (desktopOverlay) container.classList.add('sidebar-overlay-active');
     try { sessionStorage.setItem('pandda_sidebar_open', '1'); } catch(_) {}
-    // ensure backdrop starts below topbar by setting its top via inline style if needed
     const topbarH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-height')) || 64;
     overlay.style.top = `${topbarH}px`;
     overlay.style.height = `calc(100vh - ${topbarH}px)`;
     document.documentElement.classList.add('no-scroll');
     document.body.style.overflow = 'hidden';
     if (desktopOverlay) applyDesktopOverlaySizing();
+    // animate in
+    requestAnimationFrame(()=> sidebar.style.transform = 'translateX(0)');
   }
 
   function closeSidebarOverlay() {
@@ -85,7 +82,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     document.body.style.overflow = '';
     overlay.style.top = '';
     overlay.style.height = '';
-    // remove sidebar inline sizing
     sidebar.style.top = '';
     sidebar.style.maxHeight = '';
     sidebar.style.left = '';
@@ -100,7 +96,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   function toggleCollapsedDesktop() {
     const collapsedNow = sidebar.classList.toggle('collapsed');
     try { localStorage.setItem(COLLAPSED_KEY, collapsedNow ? '1' : '0'); } catch(_) {}
-    // If toggled to expanded on desktop, open as overlay-desktop
     if (!isMobile()) {
       if (!collapsedNow) openSidebarOverlay(true);
       else closeSidebarOverlay();
@@ -108,7 +103,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     updateTooltips();
   }
 
-  // create menu item with tooltip text
   function makeItem(href, icon, text, attrs = {}) {
     const li = document.createElement('li');
     li.className = 'sidebar-item';
@@ -117,6 +111,7 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     a.className = 'sidebar-link';
     a.setAttribute('data-route', href.startsWith('#/') ? href.replace('#/','') : href);
     a.setAttribute('role', 'button');
+    a.setAttribute('tabindex', '0');
 
     const iconEl = document.createElement('span');
     iconEl.className = 'icon';
@@ -209,45 +204,37 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     }
   }
 
-  // compute overlay sizing and position (desktop)
   function applyDesktopOverlaySizing() {
     try {
       const viewRoot = document.querySelector('#view-root') || document.querySelector('main') || document.querySelector('.main-area');
       const viewRect = viewRoot ? viewRoot.getBoundingClientRect() : null;
       const topbarH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-height')) || 64;
-      // desired top: align with the top of the first card or viewRoot top relative to viewport
-      let desiredTop = topbarH + 8; // fallback small gap under topbar
+      let desiredTop = topbarH + 8;
       if (viewRect) desiredTop = Math.max(topbarH + 8, viewRect.top + window.scrollY);
 
       const header = sidebar.querySelector('.sidebar-header');
       const list = sidebar.querySelector('.sidebar-list');
       const headerH = header ? header.getBoundingClientRect().height : 0;
-      // compute total list height (sum children)
       const items = list ? Array.from(list.children) : [];
       const listH = items.reduce((acc, el) => acc + el.getBoundingClientRect().height, 0);
-      const contentHeight = Math.ceil(headerH + listH + 20); // padding
+      const contentHeight = Math.ceil(headerH + listH + 24);
 
-      const available = Math.max(120, window.innerHeight - (desiredTop + 24));
+      const available = Math.max(160, window.innerHeight - (desiredTop + 28));
       const finalH = Math.min(contentHeight, available);
 
-      // set sidebar top relative to viewport (fixed)
       sidebar.style.top = `${desiredTop}px`;
       sidebar.style.left = `18px`;
       sidebar.style.maxHeight = `${finalH}px`;
-
-      // set CSS var for max height fallback
       container.style.setProperty('--sidebar-overlay-max-height', `${finalH}px`);
     } catch (e) {
       console.warn('applyDesktopOverlaySizing failed', e);
     }
   }
 
-  // overlay click: close both mobile and desktop overlays when clicking backdrop
   overlay.addEventListener('click', () => {
     if (container.classList.contains('sidebar-overlay-active') || isMobile()) closeSidebarOverlay();
   });
 
-  // click outside handler works for both mobile overlay and desktop overlay
   document.addEventListener('click', (e) => {
     if (!container.classList.contains('open')) return;
     if (!sidebar) return;
@@ -256,12 +243,10 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     closeSidebarOverlay();
   }, { capture: true });
 
-  // ESC closes overlay
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && container.classList.contains('open')) closeSidebarOverlay();
   });
 
-  // init collapsed state and resize handling
   try {
     const stored = readStoredCollapsed();
     if (!isMobile()) applyCollapsed(stored);
@@ -272,13 +257,11 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     });
   } catch(_) {}
 
-  // global toggle
   window.togglePanddaSidebar = function(source = 'topbar') {
     if (isMobile()) toggleSidebarMobile();
     else toggleCollapsedDesktop();
   };
 
-  // delegation from topbar
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-sidebar-toggle]');
     if (!btn) return;
@@ -289,7 +272,6 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
   window.addEventListener('hashchange', () => setActiveRoute(getCurrentRoute()));
   window.addEventListener('popstate', () => setActiveRoute(getCurrentRoute()));
 
-  // initial render
   buildList().catch(()=>{});
 
   const api = {

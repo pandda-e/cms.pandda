@@ -1,7 +1,4 @@
 // public/js/components/topbar.js
-// Topbar resilient: ensures hamburger always triggers window.togglePanddaSidebar,
-// uses delegation fallback, emits a diagnostic event and logs for easier debugging.
-
 function createEl(tag, attrs = {}, children = []) {
   const el = document.createElement(tag);
   for (const k in attrs) {
@@ -51,7 +48,6 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
     return null;
   }
 
-  // Accessibility: ensure container interactive content is not hidden from AT
   try { container.removeAttribute('aria-hidden'); } catch(_) {}
 
   if (container.__topbar_mounted) return container.__topbar_api || null;
@@ -62,21 +58,15 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
   const { topbar, hamburger, themeBtn, logoutBtn, userEmail } = createTopbarStructure();
   container.appendChild(topbar);
 
-  // Ensure the hamburger always triggers toggle - robust handler
   async function ensureSidebarAndToggle() {
-    // primary: call global toggle if present
     if (typeof window.togglePanddaSidebar === 'function') {
       try {
         window.togglePanddaSidebar('topbar');
         try { window.dispatchEvent(new CustomEvent('pandda:sidebar:request-toggle', { detail: { source: 'topbar', via: 'global-fn' } })); } catch(_) {}
-        console.debug('topbar: invoked window.togglePanddaSidebar()');
         return true;
-      } catch (e) {
-        console.warn('topbar: window.togglePanddaSidebar threw', e);
-      }
+      } catch (e) { console.warn('topbar: window.togglePanddaSidebar threw', e); }
     }
 
-    // secondary: try to lazy-load the sidebar module and then call toggle
     try {
       const mod = await import('/js/components/sidebar.js').catch(err => { throw err; });
       if (mod && typeof mod.setupSidebar === 'function') {
@@ -85,54 +75,36 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
         if (typeof window.togglePanddaSidebar === 'function') {
           window.togglePanddaSidebar('topbar');
           try { window.dispatchEvent(new CustomEvent('pandda:sidebar:request-toggle', { detail: { source: 'topbar', via: 'lazy-load' } })); } catch(_) {}
-          console.debug('topbar: lazy-loaded sidebar and invoked togglePanddaSidebar()');
           return true;
         }
       }
-    } catch (err) {
-      console.warn('topbar: failed to lazy-load sidebar module', err);
-    }
+    } catch (err) { console.warn('topbar: failed to lazy-load sidebar module', err); }
 
-    // last resort: dispatch a request event for external listeners to react
     try {
       window.dispatchEvent(new CustomEvent('pandda:sidebar:request-toggle', { detail: { source: 'topbar', via: 'none' } }));
-      console.debug('topbar: dispatched pandda:sidebar:request-toggle for external handlers');
     } catch (_) {}
     return false;
   }
 
   function bindHandlers() {
-    // Attach direct handler to hamburger element (if present)
     if (!hamburger.__pandda_attached) {
       hamburger.__pandda_attached = true;
       hamburger.addEventListener('click', async (e) => {
         e.preventDefault();
-        try {
-          console.debug('topbar: hamburger clicked (direct handler)');
-          await ensureSidebarAndToggle();
-        } catch (err) {
-          console.warn('topbar: error in hamburger click', err);
-        }
+        try { await ensureSidebarAndToggle(); } catch (err) { console.warn('topbar: error in hamburger click', err); }
       }, { passive: false });
     }
 
-    // Delegation fallback: ensure any element with [data-sidebar-toggle] triggers toggle
     if (!document.__pandda_topbar_delegation) {
       document.__pandda_topbar_delegation = true;
       document.addEventListener('click', async (e) => {
         const btn = e.target.closest('[data-sidebar-toggle]');
         if (!btn) return;
         e.preventDefault();
-        try {
-          console.debug('topbar: delegated click on [data-sidebar-toggle] element');
-          await ensureSidebarAndToggle();
-        } catch (err) {
-          console.warn('topbar: delegated handler error', err);
-        }
+        try { await ensureSidebarAndToggle(); } catch (err) { console.warn('topbar: delegated handler error', err); }
       }, { capture: false });
     }
 
-    // theme toggle fallback
     themeBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
@@ -148,7 +120,6 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
       } catch (err) { console.warn('theme toggle failed', err); }
     });
 
-    // logout with confirmation
     logoutBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       const ok = confirm('Deseja realmente sair?');
@@ -157,13 +128,10 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
         const sessionMod = await import('/js/auth/session.js');
         if (sessionMod && typeof sessionMod.signOut === 'function') { await sessionMod.signOut(); return; }
         if (sessionMod && typeof sessionMod.clearSession === 'function') { await sessionMod.clearSession(); return; }
-      } catch (err) {
-        console.warn('logout via session module failed', err);
-      }
+      } catch (err) { console.warn('logout via session module failed', err); }
       try { location.replace('/login.html'); } catch(_) {}
     });
 
-    // populate user email and keep updated
     (async () => {
       try {
         const sessionMod = await import('/js/auth/session.js');

@@ -7,19 +7,39 @@
   <link rel="stylesheet" href="/css/globals.css" />
   <link rel="stylesheet" href="/css/login.css" />
   <link rel="stylesheet" href="/css/sidebar.css" />
+  <link rel="stylesheet" href="/css/topbar.css" />
 </head>
 <body class="theme-light">
   <main class="login-root" role="main">
-    <section class="login-panel">
-      <h1>Entrar</h1>
-      <form id="login-form" action="#" autocomplete="on" novalidate>
-        <label for="email">E‑mail</label>
-        <input id="email" name="email" type="email" required />
-        <label for="password">Senha</label>
-        <input id="password" name="password" type="password" required />
-        <button id="btn-login" type="submit">Entrar</button>
-        <p id="login-status" class="small"></p>
+    <section class="login-card" style="width:100%;max-width:480px;">
+      <div class="login-header" style="align-items:center;">
+        <div class="brand" style="gap:14px;">
+          <div class="brand-logo" aria-hidden="true"></div>
+          <div>
+            <h1 style="margin:0;font-size:18px;">Pandda</h1>
+            <div class="small" style="margin-top:6px;">Painel de administração</div>
+          </div>
+        </div>
+        <button id="btn-theme-toggle" class="theme-toggle" title="Alternar tema">🌓</button>
+      </div>
+
+      <form id="login-form" class="login-form" action="#" autocomplete="on" novalidate>
+        <label class="label" for="email">E‑mail</label>
+        <input id="email" name="email" type="email" required placeholder="seu@exemplo.com" />
+
+        <label class="label" for="password">Senha</label>
+        <input id="password" name="password" type="password" required placeholder="••••••••" />
+
+        <div style="display:flex;gap:12px;align-items:center;margin-top:6px;">
+          <button id="btn-login" class="btn primary" type="submit" style="flex:1;padding:12px 14px;border-radius:12px;">Entrar</button>
+        </div>
+
+        <p id="login-status" class="small" style="margin-top:8px;"></p>
       </form>
+
+      <div class="login-footer small" style="margin-top:12px;text-align:center;color:var(--muted)">
+        Versão 0.0.1 — © Pandda
+      </div>
     </section>
   </main>
 
@@ -31,6 +51,8 @@
       const createClient = sdk.createClient;
       const { createSupabaseClient } = await import('/src/core/supabase.js');
       const sessionMod = await import('/js/auth/session.js');
+      const theme = await import('/src/core/theme.js').catch(()=>null);
+      theme && theme.initTheme && theme.initTheme();
 
       const sup = createSupabaseClient(createClient);
       window.__SUPABASE_CLIENT = sup;
@@ -38,6 +60,10 @@
       const form = document.getElementById('login-form');
       const statusEl = document.getElementById('login-status');
       const REDIRECT_LOCK_KEY = 'pandda_redirect_lock';
+
+      document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
+        try { theme && theme.toggleTheme && theme.toggleTheme(); } catch(_) {}
+      });
 
       async function waitForSdkSession(timeoutMs = 2500, intervalMs = 150) {
         const start = Date.now();
@@ -61,13 +87,10 @@
           const res = await sup.auth.signInWithPassword({ email, password });
           if (res.error) throw res.error;
 
-          // wait a short moment for SDK to persist session
           const sdkSession = await waitForSdkSession(3000, 150);
 
-          // ensure app session initialized from SDK
           try { await sessionMod.initialize(sup); } catch(e){ console.warn('session init after login failed', e); }
 
-          // set lock briefly to avoid race loops, then redirect to root immediately
           try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
           statusEl.textContent = 'Login bem‑sucedido; redirecionando…';
           location.replace('/');
@@ -77,19 +100,14 @@
         }
       });
 
-      // On load: if SDK already has a session, redirect immediately to root
       try {
         const { data } = await sup.auth.getSession();
         const user = data?.session?.user;
         if (user) {
-          // If session exists, force redirect to app root.
-          // Do not let a stale lock block this redirect (login page intent is to leave).
           try { sessionStorage.setItem(REDIRECT_LOCK_KEY, String(Date.now())); } catch(_) {}
           location.replace('/');
         }
-      } catch(_) {
-        // ignore; user will login manually
-      }
+      } catch(_) {}
     } catch (err) {
       console.error('login bootstrap failed', err);
       document.getElementById('login-status').textContent = 'Erro interno, recarregue a página.';
