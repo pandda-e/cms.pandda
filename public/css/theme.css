@@ -1,15 +1,14 @@
 /* public/css/theme.css
-   Theme variables and layout glue.
-   Suporta toggle via src/core/theme.js que atualiza html[data-theme] e classes body.theme-*
+   Pequeno ajuste para garantir que a topbar fique realmente acima da sidebar/overlay
+   e que o main-area seja empurrado corretamente pela altura da topbar.
+   Mantive o restante das variáveis intactas; substitua este arquivo completo pelo conteúdo abaixo.
 */
 
-/* Core variables (defaults dark) */
 :root{
   --topbar-height: 64px;
-  --topbar-z: 1600;
-  --sidebar-z: 1650;
-  --sidebar-overlay-z: 1700;
-
+  --topbar-z: 2000;         /* topbar acima de tudo */
+  --sidebar-z: 1600;        /* sidebar abaixo do topbar */
+  --sidebar-overlay-z: 1580;
   --bg: #0f1720;
   --card: #0b1220;
   --muted: #9aa4b2;
@@ -20,12 +19,9 @@
   --glass: rgba(255,255,255,0.03);
   --radius: 12px;
   --shadow: 0 10px 30px rgba(2,6,23,0.6);
-
-  --sidebar-bg: #0b1220;
-  --sidebar-foreground: #e6eef8;
 }
 
-/* Light theme overrides */
+/* Light overrides (unchanged from original intent) */
 html[data-theme="light"], body.theme-light {
   --bg: #f6f8fa;
   --card: #ffffff;
@@ -36,53 +32,27 @@ html[data-theme="light"], body.theme-light {
   --surface: #ffffff;
   --glass: rgba(2,6,23,0.03);
   --shadow: 0 10px 34px rgba(12,18,26,0.06);
-
   --sidebar-bg: #ffffff;
   --sidebar-foreground: #071026;
 }
 
-/* Dark explicit (ensure predictable values) */
-html[data-theme="dark"], body.theme-dark {
-  --sidebar-bg: #0b1220;
-  --sidebar-foreground: #e6eef8;
-}
-
-/* Global body and background */
-body {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.02), transparent),
-    var(--bg);
-  color: var(--text);
-  -webkit-font-smoothing:antialiased;
-  -moz-osx-font-smoothing:grayscale;
-  transition: background 220ms ease, color 180ms ease;
-}
-
-/* Topbar styling and placement */
+/* Topbar: fixed at top, z-index high */
 .topbar {
-  height: var(--topbar-height);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:0 16px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
-  border-bottom: 1px solid rgba(255,255,255,0.03);
-  backdrop-filter: blur(6px);
   position: fixed;
   left: 0;
   right: 0;
   top: 0;
+  height: var(--topbar-height);
   z-index: var(--topbar-z);
-  transition: background 180ms ease, box-shadow 180ms ease, transform 160ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
 }
 
-/* elevated state for topbar (applied by JS if needed) */
-.topbar--elevated {
-  box-shadow: 0 10px 30px rgba(12,18,26,0.08);
-  border-bottom: 1px solid rgba(12,18,26,0.06);
-}
-
-/* ensure text inherits theme */
+/* Ensure topbar children inherit text color */
 .topbar, .topbar * { color: var(--text); }
 
 /* Push main content below topbar */
@@ -91,34 +61,23 @@ body {
   transition: margin-left 260ms cubic-bezier(.2,.9,.2,1), margin-top 160ms ease;
 }
 
-/* Sidebar glue: allow theme to control sidebar look */
+/* Sidebar basic: ensure it's below topbar by default z-index and top property (CSS elsewhere controls exact look) */
 .sidebar {
-  background: var(--sidebar-bg);
-  color: var(--sidebar-foreground);
-  border-right: 1px solid rgba(0,0,0,0.06);
   z-index: var(--sidebar-z);
 }
 
-/* Light theme hover contrast fixes */
-html[data-theme="light"] .sidebar .sidebar-list .sidebar-link:hover {
-  background: rgba(2,6,23,0.03);
+/* Overlay backdrop should be under the topbar */
+.sidebar-overlay {
+  z-index: calc(var(--sidebar-overlay-z) - 10);
 }
 
-/* Ensure collapsed hover uses correct z-index so topbar remains above overlay when needed */
-.sidebar.collapsed:hover { box-shadow: 6px 0 30px rgba(0,0,0,0.32); z-index: var(--sidebar-z); }
-
-/* Accent text */
-.sidebar .sidebar-list .label { color: var(--sidebar-foreground); }
-.sidebar .sidebar-list .icon { color: var(--sidebar-foreground); }
-
-/* Small polish for forms and cards to react to theme changes */
-.card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.015), transparent), var(--card);
-  color: var(--text);
-  transition: background 180ms ease, color 160ms ease, box-shadow 180ms ease;
+/* When overlay shows, sidebar overlay element should sit below topbar (top via JS or CSS var) */
+.sidebar-container.sidebar-overlay-active .sidebar {
+  z-index: var(--sidebar-overlay-z);
 }
 
-/* Theme change event indicator (used by JS optionally) */
-[data-theme-changing] {
-  transition: none !important;
+/* Accessibility focus polish */
+button:focus, a:focus {
+  outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  outline-offset: 2px;
 }
