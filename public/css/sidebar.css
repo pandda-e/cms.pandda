@@ -1,6 +1,8 @@
 /* public/css/sidebar.css
-   Arquivo completo com refinamentos para z-index, transições, destaque ativo,
-   tooltips e estilos de overlay que respeitam topbar.
+   Arquivo completo com refinamentos:
+   - overlay respeita topbar
+   - no estado collapsed, esconder brand-title (título e subtítulo)
+   - manter o restante do estilo e comportamento previamente definidos
 */
 
 :root{
@@ -94,6 +96,14 @@
 .sidebar-header { display:flex; align-items:center; gap:12px; padding:14px; border-bottom:1px solid rgba(255,255,255,0.03); border-top-left-radius: var(--sidebar-overlay-radius); border-top-right-radius: var(--sidebar-overlay-radius); }
 .sidebar-header .brand { display:flex; gap:10px; align-items:center; font-weight:700; }
 .sidebar-header .logo { width:40px; height:40px; border-radius:10px; background:var(--glass); }
+
+/* brand-title (título e subtítulo) */
+.sidebar-header .brand-title { display:flex; flex-direction:column; line-height:1; }
+.sidebar-header .brand-title > div:first-child { font-weight:700; }
+.sidebar-header .brand-title > div + div { font-size:12px; color:var(--muted); }
+
+/* esconder brand-title quando collapsed (apenas ícone permanece) */
+.sidebar.collapsed .brand-title { display: none !important; visibility: hidden !important; width: 0 !important; height: 0 !important; padding: 0 !important; margin: 0 !important; overflow: hidden !important; }
 
 /* list */
 .sidebar-list { list-style:none; margin:0; padding:10px 8px; display:flex; flex-direction:column; gap:8px; }

@@ -1,9 +1,6 @@
 /* public/css/topbar.css
-   Estilos refinados para a topbar:
-   - garante z-index acima do overlay da sidebar
-   - transições suaves
-   - foco acessível e tamanhos responsivos
-   - botões consistentes (hamburger, theme, logout)
+   Topbar refinada: sempre fixa no topo da página (top: 0),
+   z-index acima do overlay da sidebar, transições e foco acessível.
 */
 
 :root{
@@ -16,7 +13,7 @@
   --btn-size: 44px;
 }
 
-/* Base */
+/* Base: topbar sempre fixa no topo */
 .topbar {
   height: var(--topbar-h);
   display:flex;
@@ -37,12 +34,13 @@
 /* Elevated state */
 .topbar--elevated { box-shadow: var(--topbar-elev); }
 
+/* Desktop: manter topbar fixa no topo, sem deslocamento vertical */
 @media (min-width: 992px) {
   .topbar {
     border-radius: var(--topbar-radius);
-    margin: 8px 16px 0 16px;
-    left: 16px;
-    right: 16px;
+    margin-left: 16px;
+    margin-right: 16px;
+    /* NÃO aplicar margin-top para evitar deslocar verticalmente abaixo do topo */
   }
 }
 
@@ -122,8 +120,6 @@
 
 /* Small polish to ensure topbar content aligns when sidebar collapses */
 .topbar .left .logo { transition: transform 160ms ease; }
-.sidebar.collapsed ~ .main-area .topbar .left .logo,
-.sidebar.collapsed .topbar .left .logo { transform: translateX(0); }
 
 /* Ensure topbar sits visually above overlays and modal-like elements */
 .topbar, .topbar * { color: var(--text); z-index: inherit; position: relative; }
