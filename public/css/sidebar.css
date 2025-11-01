@@ -1,8 +1,5 @@
 /* public/css/sidebar.css
-   Arquivo completo com refinamentos:
-   - overlay respeita topbar
-   - no estado collapsed, esconder brand-title (título e subtítulo)
-   - manter o restante do estilo e comportamento previamente definidos
+   Sidebar atualizada: sempre posicionada abaixo da topbar; overlay não cobre a topbar.
 */
 
 :root{
@@ -68,6 +65,9 @@
   opacity: 1;
 }
 
+/* Ensure main content is pushed below the topbar */
+.main-area { margin-top: var(--topbar-height); transition: margin-left var(--transition-medium) cubic-bezier(.2,.9,.2,1), margin-top 160ms ease; }
+
 /* docked offset under topbar for desktop */
 @media (min-width: 992px) {
   .sidebar {
@@ -78,9 +78,6 @@
   }
 
   /* main-area transitions and push rules for docked sidebar */
-  .main-area {
-    transition: margin-left var(--transition-medium) cubic-bezier(.2,.9,.2,1);
-  }
   .sidebar-container:not(.sidebar-overlay-active):not(.collapsed) + .main-area {
     margin-left: var(--sidebar-w);
   }
@@ -164,7 +161,7 @@
   z-index: calc(var(--sidebar-overlay-z));
   position: fixed;
   left: 18px;
-  top: calc(var(--topbar-height) + 8px);
+  top: calc(var(--topbar-height) + 8px); /* garante que sidebar comece abaixo da topbar */
   transform: translateX(0);
   width: var(--sidebar-w);
   max-width: calc(100vw - 48px);

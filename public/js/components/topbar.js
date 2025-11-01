@@ -1,6 +1,7 @@
 // public/js/components/topbar.js
-// Topbar que controla toggle da sidebar, toggle de tema, exibição de e‑mail do usuário e logout.
-// Refinamentos: aria-expanded, foco acessível, debounce em eventos, delegação robusta.
+// Topbar que oferece API pública com método reflow().
+// Quando reflow é chamado, o topbar recalcula sua altura e emite 'pandda:topbar:resized'.
+// Mantém handlers para toggle de sidebar, tema, logout e atualização do e-mail do usuário.
 
 function createEl(tag, attrs = {}, children = []) {
   const el = document.createElement(tag);
@@ -16,6 +17,14 @@ function createEl(tag, attrs = {}, children = []) {
     else if (c instanceof Node) el.appendChild(c);
   });
   return el;
+}
+
+function debounce(fn, ms = 120) {
+  let t = null;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
 }
 
 function createTopbarStructure() {
@@ -49,15 +58,7 @@ function createTopbarStructure() {
   const actions = createEl('div', { class: 'actions row' }, [themeBtn, userMenu]);
 
   const topbar = createEl('div', { class: 'topbar' }, [left, actions]);
-  return { topbar, hamburger, themeBtn, logoutBtn, userEmail };
-}
-
-function debounce(fn, ms = 120) {
-  let t = null;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), ms);
-  };
+  return { topbar, hamburger, themeBtn, logoutBtn, userEmail, brand };
 }
 
 export async function mountTopbar(containerSelector = '#topbar-container', opts = {}) {
@@ -67,27 +68,24 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
     return null;
   }
 
-  try { container.removeAttribute('aria-hidden'); } catch(_) {}
-
   if (container.__topbar_mounted) return container.__topbar_api || null;
   container.__topbar_mounted = true;
 
   while (container.firstChild) container.removeChild(container.firstChild);
 
-  const { topbar, hamburger, themeBtn, logoutBtn, userEmail } = createTopbarStructure();
+  const { topbar, hamburger, themeBtn, logoutBtn, userEmail, brand } = createTopbarStructure();
   container.appendChild(topbar);
+
+  // ensure container accessible properties
+  try { container.removeAttribute('aria-hidden'); } catch(_) {}
 
   async function ensureSidebarAndToggle() {
     if (typeof window.togglePanddaSidebar === 'function') {
       try {
-        const wasOpen = document.getElementById('sidebar')?.classList.contains('collapsed') === false && document.getElementById('sidebar') && document.querySelector('#sidebar-container')?.classList.contains('open');
-        await Promise.resolve().then(() => window.togglePanddaSidebar('topbar'));
-        try { window.dispatchEvent(new CustomEvent('pandda:sidebar:request-toggle', { detail: { source: 'topbar', via: 'global-fn' } })); } catch(_) {}
-        // update aria-expanded
-        const expanded = document.querySelector('#sidebar-container')?.classList.contains('open') || (!document.querySelector('#sidebar')?.classList.contains('collapsed') && !window.matchMedia('(max-width: 991px)').matches);
-        hamburger.setAttribute('aria-expanded', String(!!expanded));
+        window.togglePanddaSidebar('topbar');
+        try { window.dispatchEvent(new CustomEvent('pandda:sidebar:request-toggle', { detail: { source: 'topbar' } })); } catch(_) {}
         return true;
-      } catch (e) { console.warn('topbar: window.togglePanddaSidebar threw', e); }
+      } catch (e) { console.warn('topbar: togglePanddaSidebar threw', e); }
     }
 
     try {
@@ -96,18 +94,14 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
         await mod.setupSidebar();
         await new Promise(r => setTimeout(r, 20));
         if (typeof window.togglePanddaSidebar === 'function') {
-          await Promise.resolve().then(() => window.togglePanddaSidebar('topbar'));
+          window.togglePanddaSidebar('topbar');
           try { window.dispatchEvent(new CustomEvent('pandda:sidebar:request-toggle', { detail: { source: 'topbar', via: 'lazy-load' } })); } catch(_) {}
-          const expanded = document.querySelector('#sidebar-container')?.classList.contains('open') || (!document.querySelector('#sidebar')?.classList.contains('collapsed') && !window.matchMedia('(max-width: 991px)').matches);
-          hamburger.setAttribute('aria-expanded', String(!!expanded));
           return true;
         }
       }
     } catch (err) { console.warn('topbar: failed to lazy-load sidebar module', err); }
 
-    try {
-      window.dispatchEvent(new CustomEvent('pandda:sidebar:request-toggle', { detail: { source: 'topbar', via: 'none' } }));
-    } catch (_) {}
+    try { window.dispatchEvent(new CustomEvent('pandda:sidebar:request-toggle', { detail: { source: 'topbar', via: 'none' } })); } catch(_) {}
     return false;
   }
 
@@ -118,7 +112,6 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
         e.preventDefault();
         try { await ensureSidebarAndToggle(); } catch (err) { console.warn('topbar: error in hamburger click', err); }
       }, { passive: false });
-      // keyboard support
       hamburger.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -170,7 +163,6 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
       try { location.replace('/login.html'); } catch(_) {}
     });
 
-    // Populate user email and subscribe to changes
     (async () => {
       try {
         const sessionMod = await import('/js/auth/session.js');
@@ -183,31 +175,50 @@ export async function mountTopbar(containerSelector = '#topbar-container', opts 
         });
       } catch (_) {}
     })();
-
-    // Keep aria-expanded in sync with sidebar open state
-    const syncExpanded = debounce(() => {
-      try {
-        const open = !!document.querySelector('#sidebar-container')?.classList.contains('open') || !!document.querySelector('#sidebar') && !document.querySelector('#sidebar')?.classList.contains('collapsed') && !window.matchMedia('(max-width: 991px)').matches;
-        hamburger.setAttribute('aria-expanded', String(!!open));
-      } catch(_) {}
-    }, 80);
-
-    window.addEventListener('resize', syncExpanded);
-    window.addEventListener('hashchange', syncExpanded);
-    document.addEventListener('pandda:sidebar:changed', syncExpanded);
   }
 
-  try { bindHandlers(); } catch (err) { console.warn('mountTopbar: bindHandlers failed', err); }
+  bindHandlers();
 
+  // reflow: recompute topbar height and dispatch a custom event so listeners (sidebar) can adjust
+  function reflow() {
+    try {
+      // measure height and set CSS variable --topbar-height on :root so CSS can adapt
+      const rect = topbar.getBoundingClientRect();
+      const h = Math.max(48, Math.round(rect.height || 64));
+      document.documentElement.style.setProperty('--topbar-height', `${h}px`);
+      // Notify interested listeners
+      const ev = new CustomEvent('pandda:topbar:resized', { detail: { height: h } });
+      window.dispatchEvent(ev);
+    } catch (e) {
+      console.warn('topbar.reflow failed', e);
+    }
+  }
+
+  // Debounced reflow on resize/DOM changes
+  const debouncedReflow = debounce(reflow, 80);
+  window.addEventListener('resize', debouncedReflow);
+
+  // Observe mutations inside topbar that can change its height (e.g., dynamic user label)
+  const mo = new MutationObserver(debouncedReflow);
+  try { mo.observe(topbar, { childList: true, subtree: true, characterData: true, attributes: true }); } catch(_) {}
+
+  // Expose API
   const api = {
     container,
+    reflow,
     refresh: async () => {
       container.__topbar_mounted = false;
       return mountTopbar(containerSelector, opts);
     }
   };
 
+  // publish API on container and window for convenience
   container.__topbar_api = api;
+  try { window.__PANDDA_TOPBAR_API = api; } catch(_) {}
+
+  // initial reflow after mount
+  setTimeout(reflow, 30);
+
   return api;
 }
 

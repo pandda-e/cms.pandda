@@ -1,11 +1,10 @@
 /* public/css/topbar.css
-   Topbar refinada: sempre fixa no topo da página (top: 0),
-   z-index acima do overlay da sidebar, transições e foco acessível.
+   Topbar atualizada para ficar sempre acima da sidebar e overlays.
 */
 
 :root{
   --topbar-h: 64px;
-  --topbar-z: 1700; /* deve ficar acima do sidebar-overlay (sidebar-overlay-z = 1580) */
+  --topbar-z: 1800; /* mais alto para garantir prioridade sobre sidebar/overlay */
   --glass: rgba(255,255,255,0.03);
   --accent: var(--accent, #6ee7b7);
   --topbar-radius: 12px;
@@ -34,13 +33,13 @@
 /* Elevated state */
 .topbar--elevated { box-shadow: var(--topbar-elev); }
 
-/* Desktop: manter topbar fixa no topo, sem deslocamento vertical */
+/* Desktop: manter topbar fixa no topo; não adicionar margin-top */
 @media (min-width: 992px) {
   .topbar {
     border-radius: var(--topbar-radius);
     margin-left: 16px;
     margin-right: 16px;
-    /* NÃO aplicar margin-top para evitar deslocar verticalmente abaixo do topo */
+    /* não usar margin-top para evitar deslocamento vertical */
   }
 }
 
@@ -118,9 +117,6 @@
   outline-offset:2px;
 }
 
-/* Small polish to ensure topbar content aligns when sidebar collapses */
-.topbar .left .logo { transition: transform 160ms ease; }
-
 /* Ensure topbar sits visually above overlays and modal-like elements */
 .topbar, .topbar * { color: var(--text); z-index: inherit; position: relative; }
 
@@ -133,7 +129,7 @@
 /* When topbar theme toggle is "pressed", reflect state */
 #btn-theme-toggle[aria-pressed="true"] { box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
 
-/* Provide small badge area for notifications if needed later */
+/* Small badge placeholder */
 .topbar .badge {
   display:inline-flex;
   align-items:center;
