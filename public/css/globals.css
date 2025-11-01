@@ -79,6 +79,9 @@ input[type="text"], input[type="email"], input[type="password"], textarea {
   background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
 }
 
+input::placeholder{color: rgba(255,255,255,0.25)}
+input:focus{box-shadow:0 8px 26px rgba(11,132,255,0.06); border-color: rgba(11,132,255,0.12);}
+
 /* responsive helpers */
 @media (max-width: 520px){
   .view-root { padding: 16px; }
