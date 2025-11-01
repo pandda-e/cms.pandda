@@ -1,8 +1,7 @@
 // public/js/components/sidebar.js
-// Overlay-on-desktop behavior with improved alignment and mobile fix.
-// Ensures overlay is placed slightly right, sized to content up to max, and backdrop click closes.
-// Desktop: toggle will dock/undock the sidebar and update the layout by toggling a 'collapsed' marker
-// on the sidebar-container so CSS can push the main-area correctly.
+// Sidebar com overlay no mobile, docking e collapse no desktop (ícones apenas).
+// Refinamentos: aria attributes, focus trap when overlay open, smoother transitions,
+// destaque visível ao ativar item, persistência robusta, eventos customizados para sincronização.
 
 export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) {
   const container = document.getElementById(sidebarContainerId);
@@ -18,6 +17,7 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     overlay = document.createElement('div');
     overlay.id = 'sidebar-overlay';
     overlay.className = 'sidebar-overlay';
+    overlay.tabIndex = -1;
     container.appendChild(overlay);
   }
 
@@ -69,18 +69,24 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     if (main) {
       if (collapsed) main.classList.add('collapsed-fallback'); else main.classList.remove('collapsed-fallback');
     }
+    dispatchChangedEvent();
   }
 
   function readStoredCollapsed() {
-    try { return localStorage.getItem(COLLAPSED_KEY) === '1'; } catch(_) { return false; }
+    try {
+      const raw = localStorage.getItem(COLLAPSED_KEY);
+      return raw === '1';
+    } catch(_) { return false; }
   }
 
-  function openSidebarOverlay(desktopOverlay = false) {
+  function openSidebarOverlay() {
     container.classList.add('open');
     container.classList.add('sidebar-overlay-active');
+    container.setAttribute('aria-hidden', 'false');
 
     try { sessionStorage.setItem('pandda_sidebar_open', '1'); } catch(_) {}
 
+    // Place overlay and sidebar below topbar so topbar stays visible above overlay.
     const topbarH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-height')) || 64;
     overlay.style.top = `${topbarH}px`;
     overlay.style.height = `calc(100vh - ${topbarH}px)`;
@@ -88,21 +94,28 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     const gap = 8;
     sidebar.style.top = `${topbarH + gap}px`;
     sidebar.style.left = `18px`;
+    sidebar.style.transform = 'translateX(0)';
 
     document.documentElement.classList.add('no-scroll');
     document.body.style.overflow = 'hidden';
+
+    // focus management: move focus into first interactive element
+    trapFocusInto(sidebar);
 
     if (!isMobile()) applyDesktopOverlaySizing();
 
     requestAnimationFrame(() => {
       overlay.style.opacity = '';
-      sidebar.style.transform = 'translateX(0)';
+      sidebar.style.opacity = '';
     });
+
+    dispatchChangedEvent();
   }
 
   function closeSidebarOverlay() {
     container.classList.remove('open');
     container.classList.remove('sidebar-overlay-active');
+    container.setAttribute('aria-hidden', 'true');
     try { sessionStorage.removeItem('pandda_sidebar_open'); } catch(_) {}
 
     document.documentElement.classList.remove('no-scroll');
@@ -113,15 +126,21 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     sidebar.style.top = '';
     sidebar.style.maxHeight = '';
     sidebar.style.left = '';
+    sidebar.style.transform = '';
+    sidebar.style.opacity = '';
 
     container.style.removeProperty('--sidebar-overlay-max-height');
+
+    releaseFocusTrap();
+
+    dispatchChangedEvent();
   }
 
   function toggleSidebarMobile() {
     if (container.classList.contains('open')) {
       closeSidebarOverlay();
     } else {
-      openSidebarOverlay(false);
+      openSidebarOverlay();
     }
   }
 
@@ -178,6 +197,13 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
       setActiveRoute(a.getAttribute('data-route') || href);
       if (isMobile()) closeSidebarOverlay();
       else if (container.classList.contains('sidebar-overlay-active')) closeSidebarOverlay();
+    });
+
+    a.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        a.click();
+      }
     });
 
     li.appendChild(a);
@@ -241,6 +267,8 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     const candidate = list.querySelector(`.sidebar-link[data-route="${normalized}"], .sidebar-link[href="#/${normalized}"], .sidebar-link[href="/${normalized}"]`);
     if (candidate) {
       candidate.classList.add('active');
+      // visual focus highlight
+      candidate.setAttribute('aria-current', 'page');
       candidate.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
   }
@@ -272,10 +300,12 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     }
   }
 
-  overlay.addEventListener('click', () => {
+  // Click on backdrop closes overlay (mobile or overlay state)
+  overlay.addEventListener('click', (e) => {
     if (container.classList.contains('sidebar-overlay-active') || isMobile()) closeSidebarOverlay();
   });
 
+  // Click outside sidebar closes when overlay is open (capture)
   document.addEventListener('click', (e) => {
     if (!container.classList.contains('open')) return;
     if (!sidebar) return;
@@ -284,10 +314,12 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     closeSidebarOverlay();
   }, { capture: true });
 
+  // Escape closes overlay
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && container.classList.contains('open')) closeSidebarOverlay();
   });
 
+  // Responsive persisted collapsed state
   try {
     const stored = readStoredCollapsed();
     if (!isMobile()) applyCollapsed(stored);
@@ -301,6 +333,7 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
     });
   } catch(_) {}
 
+  // Toggle function exposed globally
   window.togglePanddaSidebar = function(source = 'topbar') {
     if (isMobile()) toggleSidebarMobile();
     else toggleCollapsedDesktop();
@@ -318,13 +351,76 @@ export function setupSidebar({ sidebarContainerId = 'sidebar-container' } = {}) 
 
   buildList().catch(()=>{});
 
+  // focus trap utilities
+  let lastFocusedBeforeTrap = null;
+  let focusableElements = [];
+  let focusTrapHandler = null;
+
+  function getFocusableWithin(root) {
+    const selectors = 'a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])';
+    return Array.from(root.querySelectorAll(selectors)).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+  }
+
+  function trapFocusInto(root) {
+    try {
+      lastFocusedBeforeTrap = document.activeElement;
+      focusableElements = getFocusableWithin(root);
+      if (focusableElements.length) focusableElements[0].focus();
+      focusTrapHandler = function(e) {
+        if (e.key !== 'Tab') return;
+        const nodes = focusableElements;
+        if (!nodes.length) return;
+        const first = nodes[0];
+        const last = nodes[nodes.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      };
+      document.addEventListener('keydown', focusTrapHandler);
+    } catch(_) {}
+  }
+
+  function releaseFocusTrap() {
+    try {
+      if (focusTrapHandler) document.removeEventListener('keydown', focusTrapHandler);
+      focusTrapHandler = null;
+      focusableElements = [];
+      if (lastFocusedBeforeTrap && typeof lastFocusedBeforeTrap.focus === 'function') lastFocusedBeforeTrap.focus();
+      lastFocusedBeforeTrap = null;
+    } catch(_) {}
+  }
+
+  function dispatchChangedEvent() {
+    try {
+      document.dispatchEvent(new CustomEvent('pandda:sidebar:changed', { detail: { open: container.classList.contains('open'), collapsed: sidebar.classList.contains('collapsed') } }));
+      // also set a general event
+      try { window.dispatchEvent(new CustomEvent('pandda:sidebar:state', { detail: { open: container.classList.contains('open'), collapsed: sidebar.classList.contains('collapsed') } })); } catch(_) {}
+    } catch(_) {}
+  }
+
+  function setActiveFromLocation() {
+    setActiveRoute(getCurrentRoute());
+  }
+
+  // expose api
   const api = {
     openSidebar: openSidebarOverlay,
     closeSidebar: closeSidebarOverlay,
     toggleSidebar: window.togglePanddaSidebar,
-    rebuild: buildList
+    rebuild: buildList,
+    setActiveFromLocation,
+    isOpen: () => container.classList.contains('open'),
+    isCollapsed: () => sidebar.classList.contains('collapsed')
   };
   container.__sidebar_api = api;
+
+  // initial sync: trigger event so topbar updates aria-expanded
+  setTimeout(() => dispatchChangedEvent(), 30);
+
   return api;
 }
 

@@ -1,11 +1,22 @@
+/* public/css/topbar.css
+   Estilos refinados para a topbar:
+   - garante z-index acima do overlay da sidebar
+   - transições suaves
+   - foco acessível e tamanhos responsivos
+   - botões consistentes (hamburger, theme, logout)
+*/
+
 :root{
-  --topbar-h:64px;
+  --topbar-h: 64px;
+  --topbar-z: 1700; /* deve ficar acima do sidebar-overlay (sidebar-overlay-z = 1580) */
   --glass: rgba(255,255,255,0.03);
   --accent: var(--accent, #6ee7b7);
   --topbar-radius: 12px;
   --topbar-elev: 0 10px 30px rgba(12,18,26,0.08);
+  --btn-size: 44px;
 }
 
+/* Base */
 .topbar {
   height: var(--topbar-h);
   display:flex;
@@ -19,10 +30,11 @@
   left: 0;
   right: 0;
   top: 0;
-  z-index: 1600;
+  z-index: var(--topbar-z);
   transition: background 200ms ease, box-shadow 200ms ease, transform 180ms ease;
 }
 
+/* Elevated state */
 .topbar--elevated { box-shadow: var(--topbar-elev); }
 
 @media (min-width: 992px) {
@@ -34,31 +46,108 @@
   }
 }
 
+/* Left group (hamburger + brand) */
 .topbar .left { display:flex; align-items:center; gap:14px; }
 .topbar .brand { display:flex; align-items:center; gap:12px; }
 .topbar .brand .logo { width:42px; height:42px; border-radius:10px; background:var(--glass); display:inline-block; }
 
+/* Actions group */
 .topbar .actions { display:flex; align-items:center; gap:12px; }
 
-.topbar-hamburger {
-  width:44px; height:44px; border-radius:10px; border:0; background:transparent; cursor:pointer;
-  display:inline-flex; align-items:center; justify-content:center; font-size:18px;
-  transition: background .12s ease, transform .08s ease;
+/* Buttons */
+.topbar-hamburger,
+#btn-theme-toggle,
+#btn-logout {
+  width: var(--btn-size);
+  height: var(--btn-size);
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+  transition: background .12s ease, transform .08s ease, box-shadow .12s ease;
 }
-.topbar-hamburger:hover { background: rgba(255,255,255,0.02); transform: translateY(-1px); }
 
+.topbar-hamburger:hover,
+#btn-theme-toggle:hover,
+#btn-logout:hover {
+  background: rgba(255,255,255,0.02);
+  transform: translateY(-1px);
+}
+
+/* Theme button slightly outlined for visibility */
 #btn-theme-toggle {
-  width:44px; height:44px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center;
-  background:transparent; border:1px solid rgba(255,255,255,0.03); cursor:pointer;
+  width: var(--btn-size);
+  height: var(--btn-size);
+  border:1px solid rgba(255,255,255,0.03);
+  padding:0;
 }
-#btn-logout { padding:8px 12px; border-radius:8px; background:transparent; border:1px solid rgba(255,255,255,0.02); }
 
-#topbar-user-email { font-size:13px; color:var(--muted); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Logout button uses pill style on wider screens */
+#btn-logout {
+  padding:8px 12px;
+  border-radius:8px;
+  background: transparent;
+  border:1px solid rgba(255,255,255,0.02);
+  min-width: 56px;
+}
 
+/* User email */
+#topbar-user-email {
+  font-size:13px;
+  color:var(--muted);
+  max-width:220px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* Responsive behavior */
 @media (max-width:820px) {
   .topbar { height:56px; padding:0 12px; }
   .topbar .brand .title { display:none; }
   #topbar-user-email { display:none; }
+  #btn-logout { display:none; } /* keep actions compact on small screens */
 }
 
-.topbar button:focus { outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset:2px; }
+/* Focus outlines for accessibility */
+.topbar button:focus,
+.topbar [role="button"]:focus {
+  outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  outline-offset:2px;
+}
+
+/* Small polish to ensure topbar content aligns when sidebar collapses */
+.topbar .left .logo { transition: transform 160ms ease; }
+.sidebar.collapsed ~ .main-area .topbar .left .logo,
+.sidebar.collapsed .topbar .left .logo { transform: translateX(0); }
+
+/* Ensure topbar sits visually above overlays and modal-like elements */
+.topbar, .topbar * { color: var(--text); z-index: inherit; position: relative; }
+
+/* Ensure sufficient hit target on mobile */
+@media (max-width:520px) {
+  :root { --btn-size: 40px; }
+  #btn-logout { display:none; }
+}
+
+/* When topbar theme toggle is "pressed", reflect state */
+#btn-theme-toggle[aria-pressed="true"] { box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+
+/* Provide small badge area for notifications if needed later */
+.topbar .badge {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:18px;
+  height:18px;
+  border-radius:9px;
+  background:var(--accent);
+  color:var(--card);
+  font-size:11px;
+  padding:0 6px;
+  margin-left:6px;
+}
